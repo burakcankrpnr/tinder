@@ -135,8 +135,40 @@ export interface ProfileBasicsDto {
   exercise: LifestyleFrequency | null;
 }
 
+export interface ProfileControlsDto {
+  smartPhotos: boolean;
+  hideAge: boolean;
+  hideDistance: boolean;
+}
+
+export interface MediaPickDto {
+  title: string;
+  imageUrl: string | null;
+}
+
+export type MediaKind = 'movie' | 'show' | 'game' | 'team' | 'song' | 'artist';
+
+export interface MediaHitDto {
+  id: string;
+  title: string;
+  subtitle: string | null;
+  imageUrl: string | null;
+}
+
+export interface ProfileShowcaseDto {
+  obsession: string | null;
+  watched: MediaPickDto[];
+  movies: MediaPickDto[];
+  teams: MediaPickDto[];
+  games: MediaPickDto[];
+  songs: MediaPickDto[];
+  artists: MediaPickDto[];
+}
+
 export interface MyProfileDto {
   age: number;
+  controls: ProfileControlsDto;
+  showcase: ProfileShowcaseDto;
   profile:
     | (ProfileBasicsDto & {
         verificationStatus: VerificationStatus;
@@ -160,7 +192,8 @@ export interface PublicProfileDto {
   id: string;
   firstName: string;
   username: string;
-  age: number;
+  /** Yaş gizlendiyse null. Sahip kendi yaşını `MyProfileDto.age` üzerinden görür. */
+  age: number | null;
   gender: Gender;
   bio: string | null;
   city: string | null;
@@ -183,8 +216,8 @@ export interface PublicProfileDto {
 export type SwipeAction = 'LIKE' | 'PASS' | 'SUPER_LIKE';
 
 export interface DiscoveryCardDto extends PublicProfileDto {
-  /** Tam sayıya yuvarlanmış, en az 1 km; kesin konum açığa çıkmaz. */
-  distanceKm: number;
+  /** Tam sayıya yuvarlanmış, en az 1 km; kesin konum açığa çıkmaz. Mesafe gizlendiyse null. */
+  distanceKm: number | null;
   commonInterests: string[];
   /** Bu kişi seni Super Like'ladı. */
   superLikedYou: boolean;
@@ -200,7 +233,7 @@ export interface MatchUserDto {
   id: string;
   firstName: string;
   username: string;
-  age: number;
+  age: number | null;
   photo: PhotoUrlsDto | null;
 }
 

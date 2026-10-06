@@ -1,12 +1,18 @@
+import type { AuthResultDto, MessageDto } from '@dating/types';
 import { registerSchema } from '@dating/validation';
-import { api, errorMessage } from '@/api';
+import { api, errorMessage, saveSession } from '@/api';
 import { ErrorText, Field, Notice, PageHeading, PrimaryButton, Screen, flagMissing } from '@/ui';
 import { useTheme } from '@/theme';
-import { Link } from 'expo-router';
+import { Link, useRouter } from 'expo-router';
 import { useState } from 'react';
+
+function isSession(value: AuthResultDto | MessageDto): value is AuthResultDto {
+  return 'accessToken' in value && typeof value.refreshToken === 'string';
+}
 
 export default function RegisterScreen() {
   const { colors } = useTheme();
+  const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [birthDate, setBirthDate] = useState('');
@@ -30,11 +36,16 @@ export default function RegisterScreen() {
     setBusy(true);
     setError(null);
     try {
-      await api('/auth/register', {
+      const result = await api<AuthResultDto | MessageDto>('/auth/register', {
         method: 'POST',
         auth: false,
         body: { email: parsed.data.email, password, birthDate },
       });
+      if (isSession(result)) {
+        await saveSession(result);
+        router.replace('/');
+        return;
+      }
       setInfo('Hesabın açıldı. Doğrulama bağlantısını e-postana gönderdik. Gelen kutuna bak, spam klasörünü de kontrol et.');
     } catch (caught) {
       setError(errorMessage(caught));
@@ -45,11 +56,7 @@ export default function RegisterScreen() {
 
   return (
     <Screen>
-      <PageHeading
-        icon="person-add"
-        title="Hesap oluşturun"
-        subtitle="E-posta adresiniz, şifreniz ve doğum tarihiniz ile hesabınızı açın. Kayıt sonrasında e-postanıza bir doğrulama bağlantısı gönderilir. Platformu kullanmak için 18 yaşından büyük olmalısınız."
-      />
+      <PageHeading icon="person-add" title="Hesap oluşturun" />
       <ErrorText>{error}</ErrorText>
       <Notice tone="success">{info}</Notice>
       <Field

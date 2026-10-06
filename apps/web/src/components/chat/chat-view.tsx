@@ -134,7 +134,8 @@ export function ChatView({ match, myUserId }: { match: MatchDetailDto; myUserId:
           <Avatar photo={other.photo} name={other.firstName} online={match.online} size="sm" />
           <span className="min-w-0">
             <span className="block truncate font-semibold">
-              {other.firstName}, {other.age}
+              {other.firstName}
+              {other.age != null ? `, ${other.age}` : ''}
             </span>
             <span className="text-text-muted block text-xs" aria-live="polite">
               {status}

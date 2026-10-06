@@ -30,15 +30,25 @@ export function isPubliclyVisible(profile: PublicProfileRecord): boolean {
   );
 }
 
+function rotate<T>(items: T[], shift: number): T[] {
+  if (items.length < 2 || shift === 0) return items;
+  const index = shift % items.length;
+  return [...items.slice(index), ...items.slice(0, index)];
+}
+
 export function toPublicProfileDto(
   profile: PublicProfileRecord,
   publicUrl: (key: string) => string,
 ): PublicProfileDto {
+  const photos = profile.user.photos.flatMap((photo) => {
+    const urls = variantUrls(photo, publicUrl);
+    return urls ? [{ id: photo.id, contentType: photo.contentType, urls }] : [];
+  });
   return {
     id: profile.userId,
     firstName: profile.firstName,
     username: profile.username,
-    age: calculateAge(profile.user.birthDate),
+    age: profile.hideAge ? null : calculateAge(profile.user.birthDate),
     gender: profile.gender,
     bio: profile.bio,
     city: profile.city,
@@ -57,10 +67,7 @@ export function toPublicProfileDto(
       slug: interest.slug,
       name: interest.name,
     })),
-    photos: profile.user.photos.flatMap((photo) => {
-      const urls = variantUrls(photo, publicUrl);
-      return urls ? [{ id: photo.id, contentType: photo.contentType, urls }] : [];
-    }),
+    photos: profile.smartPhotos ? rotate(photos, new Date().getUTCDate()) : photos,
     verified: profile.verificationStatus === 'VERIFIED',
   };
 }

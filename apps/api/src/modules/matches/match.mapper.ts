@@ -6,7 +6,7 @@ import { variantUrls } from '../photos/photo.mapper';
 export const matchUserSelect = {
   id: true,
   birthDate: true,
-  profile: { select: { firstName: true, username: true } },
+  profile: { select: { firstName: true, username: true, hideAge: true } },
   photos: { where: { status: 'APPROVED' }, orderBy: { position: 'asc' }, take: 1 },
 } satisfies Prisma.UserSelect;
 
@@ -18,7 +18,7 @@ export function toMatchUserDto(user: MatchUserRecord, publicUrl: (key: string) =
     id: user.id,
     firstName: user.profile?.firstName ?? '',
     username: user.profile?.username ?? '',
-    age: calculateAge(user.birthDate),
+    age: user.profile?.hideAge ? null : calculateAge(user.birthDate),
     photo: photo ? variantUrls(photo, publicUrl) : null,
   };
 }

@@ -72,9 +72,10 @@ export default function LikesScreen() {
                   )}
                   <View style={ui.overlay}>
                     <Text style={{ color: colors.text, fontWeight: '700', fontSize: 16 }}>
-                      {item.firstName}, {item.age}
+                      {item.firstName}
+                      {item.age != null ? `, ${item.age}` : ''}
                     </Text>
-                    <Text style={ui.hint}>{item.distanceKm} km uzakta</Text>
+                    {item.distanceKm != null ? <Text style={ui.hint}>{item.distanceKm} km uzakta</Text> : null}
                   </View>
                 </View>
               );

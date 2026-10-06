@@ -14,7 +14,7 @@ export function toPublicView(me: MyProfileDto, id: string): PublicProfileDto | n
     id,
     firstName: profile.firstName,
     username: profile.username,
-    age: me.age,
+    age: me.controls.hideAge ? null : me.age,
     gender: profile.gender,
     bio: profile.bio,
     city: profile.city,
@@ -27,7 +27,9 @@ export function toPublicView(me: MyProfileDto, id: string): PublicProfileDto | n
     lifestyle: { drinking: profile.drinking, smoking: profile.smoking, exercise: profile.exercise },
     interests: me.interests.map(({ slug, name }) => ({ slug, name })),
     photos: me.photos.flatMap((photo) =>
-      photo.status === 'APPROVED' && photo.urls ? [{ id: photo.id, urls: photo.urls }] : [],
+      photo.status === 'APPROVED' && photo.urls
+        ? [{ id: photo.id, contentType: photo.contentType, urls: photo.urls }]
+        : [],
     ),
     verified: profile.verificationStatus === 'VERIFIED',
   };
@@ -100,7 +102,8 @@ export function ProfileView({ profile }: { profile: PublicProfileDto }) {
       <div className="space-y-6">
         <header className="space-y-1">
           <h1 className="flex items-center gap-2 text-3xl font-semibold tracking-tight">
-            {profile.firstName}, {profile.age}
+            {profile.firstName}
+            {profile.age != null ? `, ${profile.age}` : ''}
             {profile.verified && (
               <span className="bg-primary/20 text-primary-soft rounded-full px-2.5 py-0.5 text-xs font-medium">
                 Doğrulanmış

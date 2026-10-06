@@ -16,13 +16,18 @@ export class InterestsService {
 
   async list(): Promise<InterestDto[]> {
     const cached = await this.redis.get(CACHE_KEY);
-    if (cached) return JSON.parse(cached) as InterestDto[];
+    if (cached) {
+      const parsed = JSON.parse(cached) as InterestDto[];
+      if (parsed.length > 0) return parsed;
+    }
 
     const interests = await this.prisma.interest.findMany({
       orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
       select: { id: true, slug: true, name: true, category: true },
     });
-    await this.redis.set(CACHE_KEY, JSON.stringify(interests), 'EX', CACHE_TTL_SECONDS);
+    if (interests.length > 0) {
+      await this.redis.set(CACHE_KEY, JSON.stringify(interests), 'EX', CACHE_TTL_SECONDS);
+    }
     return interests;
   }
 

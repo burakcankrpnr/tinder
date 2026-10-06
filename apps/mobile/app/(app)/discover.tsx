@@ -268,12 +268,15 @@ export default function DiscoverScreen() {
                 <Text style={{ color: colors.primary, fontWeight: '700' }}>Sizi Super Like ile beğendi</Text>
               ) : null}
               <Text style={{ color: colors.onPhoto, fontSize: 28, fontWeight: '700' }}>
-                {card.firstName}, {card.age}
+                {card.firstName}
+                {card.age != null ? `, ${card.age}` : ''}
               </Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Ionicons name="navigate" size={16} color={colors.onPhotoMuted} />
-                <Text style={[ui.subtitle, { color: colors.onPhotoMuted }]}>{card.distanceKm} km uzakta</Text>
-              </View>
+              {card.distanceKm != null ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Ionicons name="navigate" size={16} color={colors.onPhotoMuted} />
+                  <Text style={[ui.subtitle, { color: colors.onPhotoMuted }]}>{card.distanceKm} km uzakta</Text>
+                </View>
+              ) : null}
               {card.bio ? <Text style={{ color: colors.onPhoto, fontSize: 15 }} numberOfLines={2}>{card.bio}</Text> : null}
             </View>
           </View>

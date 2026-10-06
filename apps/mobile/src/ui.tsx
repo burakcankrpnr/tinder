@@ -24,7 +24,7 @@ import {
   setMenuMeasurer,
   type ScrollMode,
 } from './field-scroll';
-import { useTheme } from './theme';
+import { completionColor, useTheme } from './theme';
 
 export { setActiveMenu, subscribeActiveMenu, useRevealField } from './field-scroll';
 
@@ -250,7 +250,7 @@ export function PageHeading({
 }: {
   icon: keyof typeof Ionicons.glyphMap;
   title: string;
-  subtitle: string;
+  subtitle?: string;
 }) {
   const { colors, ui } = useTheme();
   return (
@@ -259,7 +259,23 @@ export function PageHeading({
         <Ionicons name={icon} size={26} color={colors.onAccent} />
       </View>
       <Text style={[ui.title, ui.centered]}>{title}</Text>
-      <Text style={[ui.subtitle, ui.centered]}>{subtitle}</Text>
+      {subtitle ? <Text style={[ui.subtitle, ui.centered]}>{subtitle}</Text> : null}
+    </View>
+  );
+}
+
+export function ProfileMeter({ percent, centered = false }: { percent: number; centered?: boolean }) {
+  const { colors, ui } = useTheme();
+  const color = completionColor(percent, colors);
+  const width = `${Math.min(100, Math.max(0, percent))}%` as const;
+  return (
+    <View style={{ gap: 8 }}>
+      <Text style={[ui.subtitle, centered ? ui.centered : null, { color, fontWeight: '700' }]}>
+        Profiliniz %{percent} dolu
+      </Text>
+      <View style={ui.meter}>
+        <View style={[ui.meterFill, { width, backgroundColor: color }]} />
+      </View>
     </View>
   );
 }

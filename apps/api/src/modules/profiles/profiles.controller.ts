@@ -6,10 +6,14 @@ import {
   type LocationInput,
   type PreferencesInput,
   type ProfileBasicsInput,
+  type ProfileControlsInput,
+  type ProfileShowcaseInput,
   interestsSchema,
   locationSchema,
   preferencesSchema,
   profileBasicsSchema,
+  profileControlsSchema,
+  profileShowcaseSchema,
   usernameParamSchema,
   usernameQuerySchema,
 } from '@dating/validation';
@@ -58,6 +62,22 @@ export class ProfilesController {
     @Body(new ZodValidationPipe(interestsSchema)) body: InterestsInput,
   ): Promise<MyProfileDto> {
     return this.profiles.updateInterests(user.id, body);
+  }
+
+  @Put('profile/me/controls')
+  updateControls(
+    @CurrentUser() user: AuthUser,
+    @Body(new ZodValidationPipe(profileControlsSchema)) body: ProfileControlsInput,
+  ): Promise<MyProfileDto> {
+    return this.profiles.updateControls(user.id, body);
+  }
+
+  @Put('profile/me/showcase')
+  updateShowcase(
+    @CurrentUser() user: AuthUser,
+    @Body(new ZodValidationPipe(profileShowcaseSchema)) body: ProfileShowcaseInput,
+  ): Promise<MyProfileDto> {
+    return this.profiles.updateShowcase(user.id, body);
   }
 
   @Put('profile/me/location')

@@ -1,12 +1,14 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Prisma, type UserProfile } from '@dating/database';
-import type { MyProfileDto, ProfileBasicsDto, PublicProfileDto } from '@dating/types';
+import type { MediaPickDto, MyProfileDto, ProfileBasicsDto, ProfileControlsDto, ProfileShowcaseDto, PublicProfileDto } from '@dating/types';
 import {
   type InterestsInput,
   type LocationInput,
   type PreferencesInput,
   type ProfileBasicsInput,
+  type ProfileControlsInput,
+  type ProfileShowcaseInput,
   calculateAge,
 } from '@dating/validation';
 import { canAuthenticate } from '../../common/auth/user-status';
@@ -27,6 +29,46 @@ import {
 import { isPubliclyVisible, publicProfileInclude, toPublicProfileDto } from './public-profile.mapper';
 
 const USABLE_PHOTO_STATUSES = ['PROCESSING', 'APPROVED', 'PENDING_REVIEW'] as const;
+
+const EMPTY_CONTROLS: ProfileControlsDto = { smartPhotos: true, hideAge: false, hideDistance: false };
+const EMPTY_SHOWCASE: ProfileShowcaseDto = {
+  obsession: null,
+  watched: [],
+  movies: [],
+  teams: [],
+  games: [],
+  songs: [],
+  artists: [],
+};
+
+function toControls(profile: UserProfile | null): ProfileControlsDto {
+  if (!profile) return EMPTY_CONTROLS;
+  return { smartPhotos: profile.smartPhotos, hideAge: profile.hideAge, hideDistance: profile.hideDistance };
+}
+
+function readPicks(value: Prisma.JsonValue): MediaPickDto[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((item) => {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) return [];
+    const record = item as Record<string, unknown>;
+    if (typeof record.title !== 'string' || record.title.trim().length === 0) return [];
+    const imageUrl = typeof record.imageUrl === 'string' && record.imageUrl.startsWith('https://') ? record.imageUrl : null;
+    return [{ title: record.title, imageUrl }];
+  });
+}
+
+function toShowcase(profile: UserProfile | null): ProfileShowcaseDto {
+  if (!profile) return EMPTY_SHOWCASE;
+  return {
+    obsession: profile.obsession,
+    watched: readPicks(profile.watched),
+    movies: readPicks(profile.movies),
+    teams: readPicks(profile.teams),
+    games: readPicks(profile.games),
+    songs: readPicks(profile.songs),
+    artists: readPicks(profile.artists),
+  };
+}
 
 function toBasicsDto(profile: UserProfile): ProfileBasicsDto {
   return {
@@ -95,6 +137,8 @@ export class ProfilesService {
 
     return {
       age: calculateAge(user.birthDate),
+      controls: toControls(profile),
+      showcase: toShowcase(profile),
       profile: profile
         ? {
             ...toBasicsDto(profile),
@@ -174,6 +218,31 @@ export class ProfilesService {
         data: input.interestIds.map((interestId) => ({ userId, interestId })),
       }),
     ]);
+    return this.getMe(userId);
+  }
+
+  async updateControls(userId: string, input: ProfileControlsInput): Promise<MyProfileDto> {
+    const updated = await this.prisma.userProfile.updateMany({ where: { userId }, data: input });
+    if (updated.count === 0) {
+      throw new AppException('CONFLICT', 'Önce profil bilgilerini doldur.', HttpStatus.CONFLICT);
+    }
+    return this.getMe(userId);
+  }
+
+  async updateShowcase(userId: string, input: ProfileShowcaseInput): Promise<MyProfileDto> {
+    const data: Prisma.UserProfileUpdateManyMutationInput = {};
+    if (input.obsession !== undefined) data.obsession = input.obsession;
+    if (input.watched) data.watched = input.watched;
+    if (input.movies) data.movies = input.movies;
+    if (input.teams) data.teams = input.teams;
+    if (input.games) data.games = input.games;
+    if (input.songs) data.songs = input.songs;
+    if (input.artists) data.artists = input.artists;
+    if (Object.keys(data).length === 0) return this.getMe(userId);
+    const updated = await this.prisma.userProfile.updateMany({ where: { userId }, data });
+    if (updated.count === 0) {
+      throw new AppException('CONFLICT', 'Önce profil bilgilerini doldur.', HttpStatus.CONFLICT);
+    }
     return this.getMe(userId);
   }
 

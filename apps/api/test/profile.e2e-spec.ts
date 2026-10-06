@@ -249,4 +249,38 @@ describe('Profile & photos (e2e)', () => {
     expect(serialized).not.toContain('ayse@example.com');
     expect(serialized).not.toContain('1995');
   });
+
+  it('stores profile controls and hides age from other people', async () => {
+    const token = await createUser('ayse@example.com');
+    const viewer = await createUser('mehmet@example.com');
+
+    await as(token).put('/api/v1/profile/me').send(BASICS).expect(200);
+    await as(token).put('/api/v1/profile/me/interests').send({ interestIds }).expect(200);
+    await uploadPhoto(token, await jpegWithExif());
+    await as(token)
+      .put('/api/v1/profile/me/preferences')
+      .send({ interestedIn: ['MAN'], ageMin: 25, ageMax: 40, maxDistanceKm: 50 })
+      .expect(200);
+    await as(token)
+      .put('/api/v1/profile/me/location')
+      .send({ latitude: 41.008238, longitude: 28.978359, city: 'İstanbul', country: 'TR' })
+      .expect(200);
+    await as(token).post('/api/v1/profile/me/complete-onboarding').expect(200);
+
+    const controls = await as(token).put('/api/v1/profile/me/controls').send({ hideAge: true, hideDistance: true }).expect(200);
+    expect(controls.body.data.controls).toMatchObject({ hideAge: true, hideDistance: true, smartPhotos: true });
+    expect(controls.body.data.age).toEqual(expect.any(Number));
+
+    const showcase = await as(token)
+      .put('/api/v1/profile/me/showcase')
+      .send({ obsession: 'fenerbahce', teams: [{ title: 'Fenerbahçe', imageUrl: null }] })
+      .expect(200);
+    expect(showcase.body.data.showcase).toMatchObject({
+      obsession: 'fenerbahce',
+      teams: [{ title: 'Fenerbahçe', imageUrl: null }],
+    });
+
+    const profile = await as(viewer).get('/api/v1/profiles/ayse').expect(200);
+    expect(profile.body.data.age).toBeNull();
+  });
 });

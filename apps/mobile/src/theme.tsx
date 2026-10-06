@@ -10,6 +10,20 @@ export function paletteFor(scheme: string | null | undefined): Palette {
   return scheme === 'light' ? lightColors : darkColors;
 }
 
+function mixColor(from: string, to: string, amount: number): string {
+  const blend = (start: number, end: number) => Math.round(start + (end - start) * amount);
+  const channel = (hex: string, index: number) => Number.parseInt(hex.slice(1 + index * 2, 3 + index * 2), 16);
+  const mixed = [0, 1, 2].map((index) => blend(channel(from, index), channel(to, index)).toString(16).padStart(2, '0'));
+  return `#${mixed.join('')}`;
+}
+
+/** Doluluk arttıkça kırmızıdan sarıya, sonra yeşile kayar. */
+export function completionColor(percent: number, colors: Palette): string {
+  const value = Math.min(100, Math.max(0, percent)) / 100;
+  if (value < 0.5) return mixColor(colors.danger, colors.warning, value / 0.5);
+  return mixColor(colors.warning, colors.success, (value - 0.5) / 0.5);
+}
+
 function createUi(colors: Palette) {
   return StyleSheet.create({
     screen: {

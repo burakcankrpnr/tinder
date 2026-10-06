@@ -654,6 +654,17 @@ model UserProfile {
   lastActiveAt          DateTime?
   /// Yalnızca beğendiği kişilere görünür (entitlement gerektirir).
   incognito             Boolean                @default(false)
+  /// Kapak fotoğrafı gün gün değişerek ilk sırayı dener.
+  smartPhotos           Boolean                @default(true)
+  hideAge               Boolean                @default(false)
+  hideDistance          Boolean                @default(false)
+  obsession             String?
+  watched               Json                   @default("[]")
+  movies                Json                   @default("[]")
+  teams                 Json                   @default("[]")
+  games                 Json                   @default("[]")
+  songs                 Json                   @default("[]")
+  artists               Json                   @default("[]")
   createdAt             DateTime               @default(now())
   updatedAt             DateTime               @updatedAt
 

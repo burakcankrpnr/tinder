@@ -7,7 +7,7 @@ import { useTheme } from '@/theme';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
 import { useVideoPlayer, VideoView } from 'expo-video';
-import { Stack, useRouter } from 'expo-router';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Image, Pressable, Text, View } from 'react-native';
 
@@ -48,6 +48,7 @@ async function byteSize(uri: string, known: number | null | undefined): Promise<
 export default function OnboardingPhotos() {
   const { colors, ui } = useTheme();
   const router = useRouter();
+  const fromProfile = useLocalSearchParams<{ from?: string }>().from === 'profile';
   const queryClient = useQueryClient();
   const photos = useQuery({ queryKey: ['photos'], queryFn: () => api<PhotoDto[]>('/photos') });
   const [localUris, setLocalUris] = useState<Record<string, string>>({});
@@ -181,7 +182,18 @@ export default function OnboardingPhotos() {
 
   return (
     <Screen header>
-      <Stack.Screen options={{ headerLeft: () => <StepBack href="/onboarding/profile" /> }} />
+      <Stack.Screen
+        options={{
+          headerLeft: () =>
+            fromProfile ? (
+              <Pressable accessibilityRole="button" accessibilityLabel="Geri" hitSlop={12} onPress={() => router.back()}>
+                <Ionicons name="chevron-back" size={28} color={colors.text} />
+              </Pressable>
+            ) : (
+              <StepBack href="/onboarding/profile" />
+            ),
+        }}
+      />
       <PageHeading
         icon="camera"
         title="Profil fotoğrafları"
@@ -251,9 +263,13 @@ export default function OnboardingPhotos() {
         busy ? <Text style={[ui.hint, ui.centered]}>Yükleniyor.</Text> : null
       )}
       <PrimaryButton
-        label="Devam et"
+        label={fromProfile ? 'Bitti' : 'Devam et'}
         disabled={busy}
         onPress={() => {
+          if (fromProfile) {
+            router.back();
+            return;
+          }
           if (!ready) {
             flagMissing(
               setError,

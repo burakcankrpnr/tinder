@@ -255,7 +255,7 @@ export class DiscoveryService {
       return [
         {
           ...toPublicProfileDto(profile, publicUrl),
-          distanceKm: displayDistance(candidate.distanceKm),
+          distanceKm: profile.hideDistance ? null : displayDistance(candidate.distanceKm),
           commonInterests: profile.user.interests
             .filter(({ interestId }) => mine.has(interestId))
             .map(({ interest }) => interest.slug),

@@ -160,9 +160,38 @@ export const usernameParamSchema = z.object({
   username: z.string().trim().toLowerCase().min(3).max(20),
 });
 
+const mediaPickSchema = z.object({
+  title: z.string().trim().min(1).max(80),
+  imageUrl: z.union([z.string().trim().url().max(500), z.null()]),
+});
+const showcaseList = z.array(mediaPickSchema).max(8);
+
+export const profileControlsSchema = z
+  .object({
+    smartPhotos: z.boolean().optional(),
+    hideAge: z.boolean().optional(),
+    hideDistance: z.boolean().optional(),
+  })
+  .refine(
+    (value) => value.smartPhotos !== undefined || value.hideAge !== undefined || value.hideDistance !== undefined,
+    { message: 'Güncellenecek bir ayar seç.' },
+  );
+
+export const profileShowcaseSchema = z.object({
+  obsession: optionalText(80),
+  watched: showcaseList.optional(),
+  movies: showcaseList.optional(),
+  teams: showcaseList.optional(),
+  games: showcaseList.optional(),
+  songs: showcaseList.optional(),
+  artists: showcaseList.optional(),
+});
+
 export type ProfileBasicsInput = z.infer<typeof profileBasicsSchema>;
 export type ProfileBasicsFormInput = z.input<typeof profileBasicsSchema>;
 export type PreferencesInput = z.infer<typeof preferencesSchema>;
 export type PreferencesFormInput = z.input<typeof preferencesSchema>;
 export type InterestsInput = z.infer<typeof interestsSchema>;
 export type LocationInput = z.infer<typeof locationSchema>;
+export type ProfileControlsInput = z.infer<typeof profileControlsSchema>;
+export type ProfileShowcaseInput = z.infer<typeof profileShowcaseSchema>;

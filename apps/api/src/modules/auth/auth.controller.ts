@@ -77,9 +77,17 @@ export class AuthController {
   async register(
     @Body(new ZodValidationPipe(registerSchema)) body: RegisterInput,
     @ReqMeta() meta: RequestMeta,
-  ): Promise<MessageDto> {
-    await this.auth.register(body, meta);
-    return { message: 'Kayıt alındı. Hesabını aktifleştirmek için emailini kontrol et.' };
+    @Req() request: Request,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<AuthResultDto | MessageDto> {
+    const mobile = isMobileClient(request);
+    const outcome = await this.auth.register(body, meta, mobile);
+    const pending: MessageDto = {
+      message: 'Kayıt alındı. Hesabını aktifleştirmek için emailini kontrol et.',
+    };
+    if (!outcome || !isMobileClient(request)) return pending;
+    setRefreshCookie(response, outcome.refreshToken, outcome.refreshExpiresAt, this.secureCookies);
+    return withMobileRefresh(outcome.result, outcome.refreshToken, true);
   }
 
   @Public()

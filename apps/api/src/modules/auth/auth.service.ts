@@ -62,7 +62,7 @@ export class AuthService {
    * Account enumeration koruması: email kayıtlı olsa da olmasa da aynı yanıt döner;
    * mevcut hesap sahibine bilgilendirme emaili gönderilir.
    */
-  async register(input: RegisterInput, meta: RequestMeta): Promise<void> {
+  async register(input: RegisterInput, meta: RequestMeta, issueSession: boolean): Promise<AuthOutcome | null> {
     if (!isAllowedAge(input.birthDate)) {
       throw new AppException(
         'VALIDATION_ERROR',
@@ -75,7 +75,9 @@ export class AuthService {
     const existing = await this.prisma.user.findUnique({ where: { email: input.email } });
     if (existing) {
       await this.mail.send(accountExistsMail(existing.email, this.appUrl('/')));
-      return;
+      if (!issueSession || !existing.passwordHash || !canAuthenticate(existing)) return null;
+      const valid = await this.passwords.verify(existing.passwordHash, input.password);
+      return valid ? this.startSession(existing, meta, 'register') : null;
     }
 
     let user: User;
@@ -84,7 +86,7 @@ export class AuthService {
         data: { email: input.email, passwordHash, birthDate: input.birthDate },
       });
     } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') return;
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') return null;
       throw error;
     }
 
@@ -98,6 +100,7 @@ export class AuthService {
     const event: UserRegisteredEvent = { userId: user.id, method: 'password' };
     this.events.emit(DomainEvent.USER_REGISTERED, event);
     await this.sendVerification(user);
+    return issueSession ? this.startSession(user, meta, 'register') : null;
   }
 
   private async sendVerification(user: User): Promise<void> {

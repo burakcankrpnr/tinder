@@ -88,6 +88,25 @@ describe('Auth flow (e2e)', () => {
     expect(me.body.data).not.toHaveProperty('birthDate');
   });
 
+  it('starts a session on the first mobile registration so onboarding can begin', async () => {
+    const email = 'yeni@example.com';
+    const response = await http
+      .post('/api/v1/auth/register')
+      .set('X-Client', 'mobile')
+      .send({ email, password: PASSWORD, birthDate: '1995-05-20' })
+      .expect(202);
+
+    expect(response.body.data.accessToken).toEqual(expect.any(String));
+    expect(response.body.data.refreshToken).toEqual(expect.any(String));
+    expect(response.body.data.user.emailVerified).toBe(false);
+
+    const me = await http
+      .get('/api/v1/profile/me')
+      .set('Authorization', `Bearer ${response.body.data.accessToken}`)
+      .expect(200);
+    expect(me.body.data.onboarding).toEqual({ completed: false, nextStep: 'profile' });
+  });
+
   it('returns the same response for duplicate registrations', async () => {
     const email = 'dup@example.com';
     const body = { email, password: PASSWORD, birthDate: '1990-01-01' };

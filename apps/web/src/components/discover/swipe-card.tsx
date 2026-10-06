@@ -163,7 +163,8 @@ export function SwipeCard({
         )}
         <div className="flex items-end gap-2">
           <h2 className="text-3xl font-semibold">
-            {card.firstName}, {card.age}
+            {card.firstName}
+            {card.age != null ? `, ${card.age}` : ''}
           </h2>
           {card.verified && (
             <span className="bg-primary/25 text-primary-soft mb-1 rounded-full px-2 py-0.5 text-xs">
@@ -172,7 +173,9 @@ export function SwipeCard({
           )}
         </div>
         <p className="text-text-muted text-sm">
-          {card.distanceKm} km uzakta{card.city ? ` · ${card.city}` : ''}
+          {card.distanceKm != null ? `${card.distanceKm} km uzakta` : ''}
+          {card.distanceKm != null && card.city ? ' · ' : ''}
+          {card.city ?? ''}
         </p>
         {card.bio && <p className="line-clamp-2 text-sm">{card.bio}</p>}
         {card.interests.length > 0 && (

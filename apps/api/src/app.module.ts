@@ -28,6 +28,7 @@ import { SafetyModule } from './modules/safety/safety.module';
 import { DiscoveryModule } from './modules/discovery/discovery.module';
 import { HealthController } from './modules/health/health.controller';
 import { InterestsModule } from './modules/interests/interests.module';
+import { MediaModule } from './modules/media/media.module';
 import { MailModule } from './modules/mail/mail.module';
 import { PhotosModule } from './modules/photos/photos.module';
 import { ProfilesModule } from './modules/profiles/profiles.module';
@@ -93,6 +94,7 @@ const REQUEST_ID_PATTERN = /^[A-Za-z0-9-]{8,64}$/;
     UsersModule,
     ActivityModule,
     InterestsModule,
+    MediaModule,
     PhotosModule,
     ProfilesModule,
     RealtimeModule,

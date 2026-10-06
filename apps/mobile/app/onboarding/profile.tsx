@@ -4,12 +4,10 @@ import { MAX_BIO_LENGTH, MAX_INTERESTS, profileBasicsSchema } from '@dating/vali
 import { api, errorMessage } from '@/api';
 import { captureLocation } from '@/place';
 import { SelectField } from '@/select-field';
-import { useTheme } from '@/theme';
-import { ErrorText, Field, PageHeading, PrimaryButton, Screen, flagMissing, showAlert } from '@/ui';
+import { ErrorText, Field, PageHeading, PrimaryButton, ProfileMeter, Screen, flagMissing, showAlert } from '@/ui';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Text, View } from 'react-native';
 
 const GENDER_OPTIONS = [
   { value: 'WOMAN', label: 'Kadın', icon: 'female' },
@@ -101,7 +99,6 @@ function profilePercent(input: { name: boolean; username: boolean; gender: boole
 }
 
 export default function OnboardingProfile() {
-  const { ui } = useTheme();
   const router = useRouter();
   const queryClient = useQueryClient();
   const me = useQuery({ queryKey: ['profile', 'me'], queryFn: () => api<MyProfileDto>('/profile/me') });
@@ -189,21 +186,9 @@ export default function OnboardingProfile() {
 
   return (
     <Screen header>
-      <PageHeading
-        icon="person"
-        title="Kendini tanıt"
-        subtitle="Adınız ve kısaca kendiniz. Konumunuz otomatik alınır; diğer kişiler sizi kilometre olarak görür. Ülke veya şehir seçmezsiniz."
-      />
+      <PageHeading icon="person" title="Kendini tanıt" />
       <ErrorText>{error}</ErrorText>
-      <View style={{ gap: 8 }}>
-        <Text style={[ui.subtitle, ui.centered]}>Profiliniz %{percent} dolu</Text>
-        <View style={ui.meter}>
-          <View style={[ui.meterFill, { width: `${percent}%` }]} />
-        </View>
-        <Text style={[ui.hint, ui.centered]}>
-          Ne kadar çok doldurursanız, o kadar çok kişinin karşısına çıkarsınız.
-        </Text>
-      </View>
+      <ProfileMeter percent={percent} centered />
       <Field label="İsim" icon="id-card" hint="Profilinizde görünecek ad." value={firstName} onChangeText={setFirstName} />
       <Field
         label="Kullanıcı adı"
@@ -230,11 +215,14 @@ export default function OnboardingProfile() {
         maxLength={MAX_BIO_LENGTH}
         multiline
       />
+      {interests.isError ? <ErrorText>{errorMessage(interests.error)}</ErrorText> : null}
       <SelectField
         label="İlgi alanları"
         icon="heart"
         placeholder={`En fazla ${MAX_INTERESTS} alan seçin`}
         multiple
+        loading={interests.isPending}
+        emptyText="İlgi alanı bulunamadı."
         options={(interests.data ?? []).map((item) => ({
           value: String(item.id),
           label: item.name,
