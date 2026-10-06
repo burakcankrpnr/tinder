@@ -1,0 +1,66 @@
+import type { Prisma } from '@dating/database';
+import type { PublicProfileDto } from '@dating/types';
+import { calculateAge } from '@dating/validation';
+import { variantUrls } from '../photos/photo.mapper';
+
+/** Public profil için gereken ilişkiler; e-posta, doğum tarihi, koordinat gibi alanlar DTO'ya taşınmaz. */
+export const publicProfileInclude = {
+  user: {
+    select: {
+      id: true,
+      birthDate: true,
+      status: true,
+      deletedAt: true,
+      interests: {
+        include: { interest: true },
+        orderBy: { interest: { sortOrder: 'asc' } },
+      },
+      photos: { where: { status: 'APPROVED' }, orderBy: { position: 'asc' } },
+    },
+  },
+} satisfies Prisma.UserProfileInclude;
+
+export type PublicProfileRecord = Prisma.UserProfileGetPayload<{ include: typeof publicProfileInclude }>;
+
+export function isPubliclyVisible(profile: PublicProfileRecord): boolean {
+  return (
+    profile.onboardingCompletedAt !== null &&
+    profile.user.deletedAt === null &&
+    profile.user.status === 'ACTIVE'
+  );
+}
+
+export function toPublicProfileDto(
+  profile: PublicProfileRecord,
+  publicUrl: (key: string) => string,
+): PublicProfileDto {
+  return {
+    id: profile.userId,
+    firstName: profile.firstName,
+    username: profile.username,
+    age: calculateAge(profile.user.birthDate),
+    gender: profile.gender,
+    bio: profile.bio,
+    city: profile.city,
+    country: profile.country,
+    occupation: profile.occupation,
+    education: profile.education,
+    heightCm: profile.heightCm,
+    languages: profile.languages,
+    relationshipIntention: profile.relationshipIntention,
+    lifestyle: {
+      drinking: profile.drinking,
+      smoking: profile.smoking,
+      exercise: profile.exercise,
+    },
+    interests: profile.user.interests.map(({ interest }) => ({
+      slug: interest.slug,
+      name: interest.name,
+    })),
+    photos: profile.user.photos.flatMap((photo) => {
+      const urls = variantUrls(photo, publicUrl);
+      return urls ? [{ id: photo.id, contentType: photo.contentType, urls }] : [];
+    }),
+    verified: profile.verificationStatus === 'VERIFIED',
+  };
+}

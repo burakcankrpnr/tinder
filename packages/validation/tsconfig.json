@@ -1,0 +1,8 @@
+{
+  "extends": "@dating/tsconfig/library.json",
+  "compilerOptions": {
+    "types": []
+  },
+  "include": ["src"],
+  "exclude": ["src/**/*.test.ts"]
+}

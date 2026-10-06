@@ -1,0 +1,28 @@
+{
+  "name": "@dating/ui",
+  "version": "0.0.0",
+  "private": true,
+  "exports": {
+    ".": "./src/index.ts",
+    "./theme.css": "./src/theme.css",
+    "./tokens": "./src/tokens.ts"
+  },
+  "files": [
+    "src"
+  ],
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint src"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0"
+  },
+  "devDependencies": {
+    "@dating/eslint-config": "workspace:*",
+    "@dating/tsconfig": "workspace:*",
+    "@types/react": "^19.3.0",
+    "eslint": "^10.12.0",
+    "react": "^19.3.0",
+    "typescript": "~6.0.3"
+  }
+}

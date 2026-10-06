@@ -1,0 +1,315 @@
+import { useContext, useEffect, useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  Dimensions,
+  Keyboard,
+  Platform,
+  Pressable,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
+  type TextInputProps,
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import { SafeAreaView, type Edges } from 'react-native-safe-area-context';
+import { FieldScrollContext, setActiveMenu, type ScrollMode } from './field-scroll';
+import { colors, ui } from './theme';
+
+export { setActiveMenu, subscribeActiveMenu, useRevealField } from './field-scroll';
+
+function ScrollThumb({ bar }: { bar: { view: number; content: number; offset: number } }) {
+  const overflow = bar.content - bar.view;
+  if (bar.view <= 0 || overflow <= 12) return null;
+  const height = Math.max(28, (bar.view / bar.content) * bar.view);
+  const top = (Math.min(Math.max(bar.offset, 0), overflow) / overflow) * (bar.view - height);
+  return (
+    <View
+      pointerEvents="none"
+      style={{
+        position: 'absolute',
+        right: 0,
+        top,
+        width: 4,
+        height,
+        borderRadius: 999,
+        backgroundColor: colors.primary,
+      }}
+    />
+  );
+}
+
+export function Screen({ children, header = false }: { children: React.ReactNode; header?: boolean }) {
+  const scrollRef = useRef<ScrollView>(null);
+  const offset = useRef(0);
+  const keyboardHeight = useRef(0);
+  const fullHeight = useRef(Dimensions.get('window').height);
+  const pending = useRef<{ target: View; mode: ScrollMode } | null>(null);
+  const [keyboardPad, setKeyboardPad] = useState(0);
+  const [bar, setBar] = useState({ view: 0, content: 0, offset: 0 });
+  const edges: Edges = header ? ['left', 'right', 'bottom'] : ['top', 'left', 'right', 'bottom'];
+
+  function reveal(target: View | null, mode: ScrollMode) {
+    if (!target) return;
+    pending.current = { target, mode };
+    target.measureInWindow((_x, y, _width, height) => {
+      const visibleBottom = Dimensions.get('window').height - keyboardHeight.current - 12;
+      const needed = y + height + (mode === 'menu' ? 200 : 0);
+      const overflow = needed - visibleBottom;
+      if (overflow > 8) {
+        scrollRef.current?.scrollTo({ y: offset.current + overflow, animated: true });
+      }
+    });
+  }
+
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const show = Keyboard.addListener(showEvent, (event) => {
+      const resized = fullHeight.current - Dimensions.get('window').height > 80;
+      keyboardHeight.current = resized ? 0 : event.endCoordinates.height;
+      setKeyboardPad(resized ? 0 : event.endCoordinates.height);
+      const current = pending.current;
+      if (current) setTimeout(() => reveal(current.target, current.mode), Platform.OS === 'ios' ? 0 : 80);
+    });
+    const hide = Keyboard.addListener(hideEvent, () => {
+      keyboardHeight.current = 0;
+      setKeyboardPad(0);
+    });
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
+
+  return (
+    <FieldScrollContext.Provider value={reveal}>
+      <SafeAreaView edges={edges} style={ui.screen}>
+        <View style={{ flex: 1 }}>
+          <ScrollView
+            ref={scrollRef}
+            style={{ flex: 1 }}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
+            showsVerticalScrollIndicator={false}
+            onLayout={(event) => {
+              const view = event.nativeEvent.layout.height;
+              setBar((current) => ({ ...current, view }));
+            }}
+            onContentSizeChange={(_width, content) => {
+              setBar((current) => ({ ...current, content }));
+            }}
+            onScroll={(event) => {
+              const next = event.nativeEvent.contentOffset.y;
+              offset.current = next;
+              setBar((current) => ({ ...current, offset: next }));
+            }}
+            scrollEventThrottle={16}
+            contentContainerStyle={[ui.screenContent, { paddingBottom: keyboardPad + 28, paddingRight: 8 }]}
+          >
+            <Pressable accessible={false} onPress={Keyboard.dismiss} style={{ gap: 22 }}>
+              {children}
+            </Pressable>
+          </ScrollView>
+          <ScrollThumb bar={bar} />
+        </View>
+      </SafeAreaView>
+    </FieldScrollContext.Provider>
+  );
+}
+
+export function Title({ children }: { children: React.ReactNode }) {
+  return <Text style={ui.title}>{children}</Text>;
+}
+
+export function Subtitle({ children }: { children: React.ReactNode }) {
+  return <Text style={ui.subtitle}>{children}</Text>;
+}
+
+export function StepBack({
+  href,
+}: {
+  href: '/onboarding/profile' | '/onboarding/photos' | '/onboarding/preferences';
+}) {
+  const router = useRouter();
+  return (
+    <Pressable accessibilityRole="button" accessibilityLabel="Geri" hitSlop={12} onPress={() => router.replace(href)}>
+      <Ionicons name="chevron-back" size={28} color={colors.text} />
+    </Pressable>
+  );
+}
+
+export function PageHeading({
+  icon,
+  title,
+  subtitle,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  title: string;
+  subtitle: string;
+}) {
+  return (
+    <View style={{ gap: 10, alignItems: 'center' }}>
+      <View style={ui.pageIcon}>
+        <Ionicons name={icon} size={26} color={colors.bgBottom} />
+      </View>
+      <Text style={[ui.title, ui.centered]}>{title}</Text>
+      <Text style={[ui.subtitle, ui.centered]}>{subtitle}</Text>
+    </View>
+  );
+}
+
+export function BrandSplash({ message = 'Hesabın hazırlanıyor' }: { message?: string }) {
+  return (
+    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16, backgroundColor: colors.bgBottom, paddingHorizontal: 32 }}>
+      <View style={ui.brandMark}>
+        <Ionicons name="flame" size={44} color={colors.bgBottom} />
+      </View>
+      <Text style={[ui.title, ui.centered]}>Dating</Text>
+      <Text style={[ui.subtitle, ui.centered]}>{message}</Text>
+      <ActivityIndicator color={colors.primary} />
+    </View>
+  );
+}
+
+export function Field({
+  label,
+  icon,
+  hint,
+  error,
+  secureTextEntry,
+  ...props
+}: { label: string; icon?: keyof typeof Ionicons.glyphMap; hint?: string; error?: string } & TextInputProps) {
+  const [hidden, setHidden] = useState(Boolean(secureTextEntry));
+  const masked = Boolean(secureTextEntry) && hidden;
+  const box = useRef<View>(null);
+  const reveal = useContext(FieldScrollContext);
+  const { onFocus, ...rest } = props;
+  return (
+    <View ref={box} style={{ gap: 8 }}>
+      <View style={ui.fieldLabel}>
+        {icon ? <Ionicons name={icon} size={18} color={colors.primarySoft} /> : null}
+        <Text style={ui.subtitle}>{label}</Text>
+      </View>
+      <View style={ui.inputWrap}>
+        <TextInput
+          placeholderTextColor={colors.textMuted}
+          style={[ui.input, secureTextEntry ? { paddingRight: 48 } : null]}
+          accessibilityLabel={label}
+          secureTextEntry={masked}
+          onFocus={(event) => {
+            setActiveMenu(null);
+            onFocus?.(event);
+            setTimeout(() => reveal(box.current, 'input'), 40);
+          }}
+          {...rest}
+        />
+        {secureTextEntry ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={hidden ? 'Şifreyi göster' : 'Şifreyi gizle'}
+            hitSlop={8}
+            onPress={() => setHidden((value) => !value)}
+            style={ui.reveal}
+          >
+            <Ionicons name={hidden ? 'eye' : 'eye-off'} size={22} color={colors.textMuted} />
+          </Pressable>
+        ) : null}
+      </View>
+      {hint ? <Text style={ui.hint}>{hint}</Text> : null}
+      {error ? <Text style={ui.error}>{error}</Text> : null}
+    </View>
+  );
+}
+
+export function PrimaryButton({
+  label,
+  onPress,
+  loading,
+  disabled,
+}: {
+  label: string;
+  onPress: () => void;
+  loading?: boolean;
+  disabled?: boolean;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      disabled={disabled || loading}
+      onPress={onPress}
+      style={({ pressed }) => [ui.primary, { opacity: pressed || disabled ? 0.7 : 1 }]}
+    >
+      {loading ? <ActivityIndicator color={colors.bgBottom} /> : <Text style={ui.primaryText}>{label}</Text>}
+    </Pressable>
+  );
+}
+
+export function SecondaryButton({ label, onPress }: { label: string; onPress: () => void }) {
+  return (
+    <Pressable accessibilityRole="button" onPress={onPress} style={ui.secondary}>
+      <Text style={ui.secondaryText}>{label}</Text>
+    </Pressable>
+  );
+}
+
+export function Notice({ tone, children }: { tone: 'danger' | 'success'; children: React.ReactNode }) {
+  if (!children) return null;
+  const danger = tone === 'danger';
+  return (
+    <View accessibilityRole="alert" style={danger ? ui.alertDanger : ui.alertSuccess}>
+      <Text style={danger ? ui.alertDangerText : ui.alertSuccessText}>{children}</Text>
+    </View>
+  );
+}
+
+export function ErrorText({ children }: { children: React.ReactNode }) {
+  return <Notice tone="danger">{children}</Notice>;
+}
+
+export function GoogleMark() {
+  return (
+    <View style={ui.googleMark}>
+      <View style={[ui.googleSlice, ui.googleSliceBlue]} />
+      <View style={[ui.googleSlice, ui.googleSliceRed]} />
+      <View style={[ui.googleSlice, ui.googleSliceYellow]} />
+      <View style={[ui.googleSlice, ui.googleSliceGreen]} />
+      <View style={ui.googleCore}>
+        <Text style={ui.googleLetter}>G</Text>
+      </View>
+    </View>
+  );
+}
+
+export function GoogleButton({
+  label,
+  onPress,
+  disabled,
+}: {
+  label: string;
+  onPress: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      disabled={disabled}
+      onPress={onPress}
+      style={({ pressed }) => [ui.google, { opacity: pressed || disabled ? 0.7 : 1 }]}
+    >
+      <GoogleMark />
+      <Text style={ui.googleText}>{label}</Text>
+    </Pressable>
+  );
+}
+
+export function OrDivider() {
+  return (
+    <View style={ui.divider}>
+      <View style={ui.dividerLine} />
+      <Text style={ui.dividerText}>veya</Text>
+      <View style={ui.dividerLine} />
+    </View>
+  );
+}

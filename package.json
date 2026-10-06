@@ -1,0 +1,34 @@
+{
+  "name": "dating-platform",
+  "private": true,
+  "packageManager": "pnpm@12.9.1",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "docker compose up -d && turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "test:e2e": "turbo run test:e2e",
+    "db:generate": "pnpm --filter @dating/database db:generate",
+    "db:migrate": "pnpm --filter @dating/database db:migrate",
+    "db:deploy": "pnpm --filter @dating/database db:deploy",
+    "db:studio": "pnpm --filter @dating/database db:studio",
+    "db:seed": "pnpm --filter @dating/database db:seed",
+    "db:seed:demo": "pnpm --filter @dating/api seed:demo",
+    "user:role": "pnpm --filter @dating/api user:role",
+    "backup": "node scripts/backup.mjs",
+    "format": "prettier --write \"**/*.{ts,tsx,js,mjs,json,md,css}\""
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.12.0",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "^3.9.9",
+    "turbo": "^2.11.7",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.71.0"
+  }
+}

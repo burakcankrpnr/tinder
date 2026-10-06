@@ -1,0 +1,812 @@
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  USER
+  MODERATOR
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  RESTRICTED
+  /// Moderasyon kararıyla kalıcı olarak kapatıldı; giriş yapamaz.
+  BANNED
+  DEACTIVATED
+}
+
+model User {
+  id              String     @id @default(uuid()) @db.Uuid
+  email           String     @unique
+  passwordHash    String?
+  emailVerifiedAt DateTime?
+  birthDate       DateTime   @db.Date
+  role            UserRole   @default(USER)
+  status          UserStatus @default(ACTIVE)
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  deletedAt       DateTime?
+
+  sessions                Session[]
+  emailVerificationTokens EmailVerificationToken[]
+  passwordResetTokens     PasswordResetToken[]
+  oauthAccounts           OAuthAccount[]
+  auditLogs               AuditLog[]
+  profile                 UserProfile?
+  preferences             UserPreferences?
+  interests               UserInterest[]
+  photos                  UserPhoto[]
+  swipesMade              Swipe[]                  @relation("SwipeActor")
+  swipesReceived          Swipe[]                  @relation("SwipeTarget")
+  matchesAsA              Match[]                  @relation("MatchUserA")
+  matchesAsB              Match[]                  @relation("MatchUserB")
+  messagesSent            Message[]
+  blocksMade              Block[]                  @relation("BlockBlocker")
+  blocksReceived          Block[]                  @relation("BlockBlocked")
+  reportsMade             Report[]                 @relation("ReportReporter")
+  reportsReceived         Report[]                 @relation("ReportReported")
+  notifications           Notification[]
+  notificationPreferences NotificationPreferences?
+  devices                 Device[]
+  subscriptions           Subscription[]
+  checkoutSessions        CheckoutSession[]
+  payments                Payment[]
+  entitlements            Entitlement[]
+  boosts                  Boost[]
+  featureOverrides        FeatureOverride[]
+  verificationRequests    VerificationRequest[]    @relation("VerificationRequester")
+  verificationsReviewed   VerificationRequest[]    @relation("VerificationReviewer")
+  reportsResolved         Report[]                 @relation("ReportResolver")
+  analyticsEvents         AnalyticsEvent[]
+
+  @@map("users")
+}
+
+model FeatureFlag {
+  key            String   @id
+  description    String
+  enabled        Boolean  @default(false)
+  /// 0-100: etkin kullanıcı yüzdesi (kullanıcı id'sine göre deterministik).
+  rolloutPercent Int      @default(100) @db.SmallInt
+  updatedById    String?  @db.Uuid
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@map("feature_flags")
+}
+
+model AnalyticsEvent {
+  id         String   @id @default(uuid()) @db.Uuid
+  name       String
+  userId     String?  @db.Uuid
+  /// Client tarafından gönderilen olaylarda tekrar gönderimi engeller.
+  clientId   String?
+  platform   String   @default("web")
+  properties Json?
+  occurredAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, clientId])
+  @@index([name, occurredAt])
+  @@index([userId, occurredAt])
+  @@index([occurredAt])
+  @@map("analytics_events")
+}
+
+enum VerificationRequestStatus {
+  AWAITING_UPLOAD
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model VerificationRequest {
+  id           String                    @id @default(uuid()) @db.Uuid
+  userId       String                    @db.Uuid
+  status       VerificationRequestStatus @default(AWAITING_UPLOAD)
+  /// Kullanıcıdan selfie'de yapması istenen hareket.
+  gesture      String
+  selfieKey    String
+  reviewedById String?                   @db.Uuid
+  reviewedAt   DateTime?
+  rejectReason String?
+  submittedAt  DateTime?
+  createdAt    DateTime                  @default(now())
+  updatedAt    DateTime                  @updatedAt
+
+  user       User  @relation("VerificationRequester", fields: [userId], references: [id], onDelete: Cascade)
+  reviewedBy User? @relation("VerificationReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@index([status, submittedAt])
+  @@index([userId, createdAt])
+  @@map("verification_requests")
+}
+
+enum BillingInterval {
+  MONTHLY
+  YEARLY
+}
+
+/// Paket limitleri burada yönetilir; kodda sabit limit yoktur.
+model SubscriptionPlan {
+  id                     String   @id @default(uuid()) @db.Uuid
+  slug                   String   @unique
+  name                   String
+  description            String?
+  /// Kuruş cinsinden (minor unit).
+  monthlyPrice           Int
+  yearlyPrice            Int
+  currency               String   @default("TRY") @db.Char(3)
+  features               String[]
+  /// Günlük like limiti; null = sınırsız.
+  swipeLimit             Int?
+  /// Haftalık Super Like hakkı.
+  superLikeLimit         Int      @default(0)
+  /// Aylık (abonelik dönemi başına) Boost hakkı.
+  boostLimit             Int      @default(0)
+  rewindEnabled          Boolean  @default(false)
+  seeLikesEnabled        Boolean  @default(false)
+  incognitoEnabled       Boolean  @default(false)
+  passportEnabled        Boolean  @default(false)
+  advancedFiltersEnabled Boolean  @default(false)
+  adFree                 Boolean  @default(false)
+  /// Ranking'de görünürlük katkısı (0-1).
+  visibilityBoost        Float    @default(0)
+  sortOrder              Int      @default(0)
+  active                 Boolean  @default(true)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  subscriptions    Subscription[]
+  checkoutSessions CheckoutSession[]
+
+  @@map("subscription_plans")
+}
+
+enum EntitlementType {
+  SUPER_LIKE
+  BOOST
+}
+
+/// Tek seferlik satın alınabilen paketler (ör. 5 Boost).
+model Product {
+  id          String          @id @default(uuid()) @db.Uuid
+  slug        String          @unique
+  name        String
+  description String?
+  type        EntitlementType
+  quantity    Int
+  price       Int
+  currency    String          @default("TRY") @db.Char(3)
+  sortOrder   Int             @default(0)
+  active      Boolean         @default(true)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  checkoutSessions CheckoutSession[]
+
+  @@map("products")
+}
+
+/// ACTIVE + cancelAtPeriodEnd = CANCEL_AT_PERIOD_END, PAST_DUE + graceUntil = GRACE_PERIOD.
+enum SubscriptionStatus {
+  ACTIVE
+  PAST_DUE
+  EXPIRED
+}
+
+/// Kullanıcı başına tek aktif (ACTIVE/PAST_DUE) abonelik: partial unique index.
+model Subscription {
+  id                     String             @id @default(uuid()) @db.Uuid
+  userId                 String             @db.Uuid
+  planId                 String             @db.Uuid
+  provider               String
+  providerSubscriptionId String
+  providerCustomerId     String?
+  interval               BillingInterval
+  status                 SubscriptionStatus
+  currentPeriodStart     DateTime
+  currentPeriodEnd       DateTime
+  cancelAtPeriodEnd      Boolean            @default(false)
+  canceledAt             DateTime?
+  graceUntil             DateTime?
+  expiringNotifiedAt     DateTime?
+  endedAt                DateTime?
+  createdAt              DateTime           @default(now())
+  updatedAt              DateTime           @updatedAt
+
+  user     User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan     SubscriptionPlan @relation(fields: [planId], references: [id])
+  payments Payment[]
+
+  @@unique([provider, providerSubscriptionId])
+  @@index([userId, status])
+  @@index([status, currentPeriodEnd])
+  @@map("subscriptions")
+}
+
+enum CheckoutKind {
+  SUBSCRIPTION
+  PRODUCT
+}
+
+enum CheckoutStatus {
+  OPEN
+  COMPLETED
+  FAILED
+  CANCELED
+  EXPIRED
+}
+
+model CheckoutSession {
+  id                 String           @id @default(uuid()) @db.Uuid
+  userId             String           @db.Uuid
+  kind               CheckoutKind
+  planId             String?          @db.Uuid
+  productId          String?          @db.Uuid
+  interval           BillingInterval?
+  provider           String
+  providerCheckoutId String?          @unique
+  amount             Int
+  currency           String           @db.Char(3)
+  status             CheckoutStatus   @default(OPEN)
+  idempotencyKey     String
+  expiresAt          DateTime
+  completedAt        DateTime?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  user     User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan     SubscriptionPlan? @relation(fields: [planId], references: [id])
+  product  Product?          @relation(fields: [productId], references: [id])
+  payments Payment[]
+
+  @@unique([userId, idempotencyKey])
+  @@index([userId, createdAt])
+  @@map("checkout_sessions")
+}
+
+enum PaymentStatus {
+  SUCCEEDED
+  FAILED
+  REFUNDED
+}
+
+model Payment {
+  id                String        @id @default(uuid()) @db.Uuid
+  userId            String        @db.Uuid
+  subscriptionId    String?       @db.Uuid
+  checkoutSessionId String?       @db.Uuid
+  provider          String
+  providerPaymentId String
+  amount            Int
+  currency          String        @db.Char(3)
+  status            PaymentStatus
+  failureReason     String?
+  refundedAt        DateTime?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subscription    Subscription?    @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+  checkoutSession CheckoutSession? @relation(fields: [checkoutSessionId], references: [id], onDelete: SetNull)
+
+  @@unique([provider, providerPaymentId])
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
+  @@map("payments")
+}
+
+/// Webhook idempotency: aynı provider event'i yalnızca bir kez işlenir.
+model PaymentEvent {
+  id              String    @id @default(uuid()) @db.Uuid
+  provider        String
+  providerEventId String
+  type            String
+  payload         Json
+  processedAt     DateTime?
+  createdAt       DateTime  @default(now())
+
+  @@unique([provider, providerEventId])
+  @@index([type, createdAt])
+  @@map("payment_events")
+}
+
+enum EntitlementSource {
+  FREE_PLAN
+  SUBSCRIPTION
+  PURCHASE
+  REFUND
+  ADMIN
+}
+
+/// Sarf edilebilir haklar; quantity atomik olarak azaltılır (CHECK quantity >= 0).
+model Entitlement {
+  id        String            @id @default(uuid()) @db.Uuid
+  userId    String            @db.Uuid
+  type      EntitlementType
+  quantity  Int
+  source    EntitlementSource
+  /// Dönemsel grant'lerin idempotency anahtarı (ör. sub:<id>:<periodStart>:SUPER_LIKE).
+  grantKey  String?
+  expiresAt DateTime?
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, grantKey])
+  @@index([userId, type])
+  @@map("entitlements")
+}
+
+model Boost {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
+  startedAt DateTime @default(now())
+  endsAt    DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, endsAt])
+  @@index([endsAt])
+  @@map("boosts")
+}
+
+/// Kullanıcı bazlı özellik/limit override'ı (admin veya kampanya).
+model FeatureOverride {
+  id          String    @id @default(uuid()) @db.Uuid
+  userId      String    @db.Uuid
+  feature     String
+  value       Json
+  reason      String?
+  createdById String?   @db.Uuid
+  expiresAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, feature])
+  @@map("feature_overrides")
+}
+
+enum SwipeAction {
+  LIKE
+  PASS
+  SUPER_LIKE
+}
+
+model Swipe {
+  id           String      @id @default(uuid()) @db.Uuid
+  actorUserId  String      @db.Uuid
+  targetUserId String      @db.Uuid
+  action       SwipeAction
+  metadata     Json?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  actor  User @relation("SwipeActor", fields: [actorUserId], references: [id], onDelete: Cascade)
+  target User @relation("SwipeTarget", fields: [targetUserId], references: [id], onDelete: Cascade)
+
+  @@unique([actorUserId, targetUserId])
+  @@index([targetUserId, action])
+  @@index([actorUserId, createdAt])
+  @@map("swipes")
+}
+
+enum MatchStatus {
+  ACTIVE
+  UNMATCHED
+  BLOCKED
+}
+
+/// userAId < userBId (DB CHECK constraint); çift başına tek kayıt.
+model Match {
+  id            String      @id @default(uuid()) @db.Uuid
+  userAId       String      @db.Uuid
+  userBId       String      @db.Uuid
+  status        MatchStatus @default(ACTIVE)
+  createdAt     DateTime    @default(now())
+  lastMessageAt DateTime?
+  expiresAt     DateTime?
+  endedAt       DateTime?
+  endedById     String?     @db.Uuid
+
+  userA        User          @relation("MatchUserA", fields: [userAId], references: [id], onDelete: Cascade)
+  userB        User          @relation("MatchUserB", fields: [userBId], references: [id], onDelete: Cascade)
+  conversation Conversation?
+
+  @@unique([userAId, userBId])
+  @@index([userAId, status])
+  @@index([userBId, status])
+  @@map("matches")
+}
+
+model Conversation {
+  id            String    @id @default(uuid()) @db.Uuid
+  matchId       String    @unique @db.Uuid
+  lastMessageAt DateTime?
+  createdAt     DateTime  @default(now())
+
+  match    Match     @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  messages Message[]
+
+  @@map("conversations")
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+}
+
+model Message {
+  id              String      @id @default(uuid()) @db.Uuid
+  conversationId  String      @db.Uuid
+  senderId        String      @db.Uuid
+  clientMessageId String      @db.Uuid
+  type            MessageType
+  body            String?
+  attachmentKey   String?
+  attachmentMeta  Json?
+  readAt          DateTime?
+  deletedAt       DateTime?
+  createdAt       DateTime    @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User         @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  reports      Report[]
+
+  @@unique([senderId, clientMessageId])
+  @@index([conversationId, createdAt])
+  @@index([conversationId, readAt])
+  @@map("messages")
+}
+
+model Block {
+  blockerId String   @db.Uuid
+  blockedId String   @db.Uuid
+  createdAt DateTime @default(now())
+
+  blocker User @relation("BlockBlocker", fields: [blockerId], references: [id], onDelete: Cascade)
+  blocked User @relation("BlockBlocked", fields: [blockedId], references: [id], onDelete: Cascade)
+
+  @@id([blockerId, blockedId])
+  @@index([blockedId])
+  @@map("blocks")
+}
+
+enum ReportReason {
+  FAKE_PROFILE
+  HARASSMENT
+  SCAM
+  SPAM
+  SEXUAL_CONTENT
+  VIOLENCE
+  UNDERAGE
+  OTHER
+}
+
+enum ReportStatus {
+  OPEN
+  REVIEWING
+  RESOLVED
+  DISMISSED
+}
+
+model Report {
+  id             String       @id @default(uuid()) @db.Uuid
+  reporterId     String       @db.Uuid
+  reportedUserId String       @db.Uuid
+  messageId      String?      @db.Uuid
+  reason         ReportReason
+  details        String?
+  status         ReportStatus @default(OPEN)
+  resolution     String?
+  resolvedById   String?      @db.Uuid
+  resolvedAt     DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  reporter     User     @relation("ReportReporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  reportedUser User     @relation("ReportReported", fields: [reportedUserId], references: [id], onDelete: Cascade)
+  resolvedBy   User?    @relation("ReportResolver", fields: [resolvedById], references: [id], onDelete: SetNull)
+  message      Message? @relation(fields: [messageId], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt])
+  @@index([reportedUserId, status])
+  @@index([reporterId, reportedUserId])
+  @@map("reports")
+}
+
+enum NotificationType {
+  NEW_MATCH
+  NEW_MESSAGE
+  SOMEONE_LIKED_YOU
+  SUBSCRIPTION_RENEWED
+  SUBSCRIPTION_EXPIRING
+  PAYMENT_FAILED
+}
+
+model Notification {
+  id        String           @id @default(uuid()) @db.Uuid
+  userId    String           @db.Uuid
+  type      NotificationType
+  /// Aynı konudaki okunmamış bildirimleri tek kayıtta toplamak için (ör. match:<id>).
+  groupKey  String?
+  data      Json
+  count     Int              @default(1)
+  readAt    DateTime?
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([userId, readAt])
+  @@index([userId, groupKey])
+  @@map("notifications")
+}
+
+model NotificationPreferences {
+  userId          String   @id @db.Uuid
+  newMatch        Boolean  @default(true)
+  newMessage      Boolean  @default(true)
+  someoneLikedYou Boolean  @default(true)
+  billing         Boolean  @default(true)
+  email           Boolean  @default(true)
+  push            Boolean  @default(true)
+  updatedAt       DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notification_preferences")
+}
+
+enum DevicePlatform {
+  WEB
+  IOS
+  ANDROID
+}
+
+/// Push bildirim hedefleri (Web Push subscription, ileride FCM/APNs token).
+model Device {
+  id         String         @id @default(uuid()) @db.Uuid
+  userId     String         @db.Uuid
+  platform   DevicePlatform
+  endpoint   String         @unique
+  keys       Json?
+  userAgent  String?
+  lastSeenAt DateTime       @default(now())
+  createdAt  DateTime       @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("devices")
+}
+
+enum Gender {
+  WOMAN
+  MAN
+  NON_BINARY
+}
+
+enum RelationshipIntention {
+  LONG_TERM
+  LONG_TERM_OPEN_TO_SHORT
+  SHORT_TERM_OPEN_TO_LONG
+  SHORT_TERM
+  FRIENDSHIP
+  NOT_SURE
+}
+
+enum LifestyleFrequency {
+  NEVER
+  SOMETIMES
+  OFTEN
+}
+
+enum VerificationStatus {
+  UNVERIFIED
+  PENDING
+  VERIFIED
+}
+
+enum PhotoStatus {
+  PENDING_UPLOAD
+  PROCESSING
+  APPROVED
+  PENDING_REVIEW
+  REJECTED
+}
+
+model UserProfile {
+  userId                String                 @id @db.Uuid
+  firstName             String
+  username              String                 @unique
+  gender                Gender
+  bio                   String?
+  city                  String?
+  country               String?                @db.Char(2)
+  occupation            String?
+  education             String?
+  heightCm              Int?                   @db.SmallInt
+  languages             String[]
+  relationshipIntention RelationshipIntention?
+  drinking              LifestyleFrequency?
+  smoking               LifestyleFrequency?
+  exercise              LifestyleFrequency?
+  verificationStatus    VerificationStatus     @default(UNVERIFIED)
+  latitude              Float?
+  longitude             Float?
+  locationUpdatedAt     DateTime?
+  onboardingCompletedAt DateTime?
+  lastActiveAt          DateTime?
+  /// Yalnızca beğendiği kişilere görünür (entitlement gerektirir).
+  incognito             Boolean                @default(false)
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([onboardingCompletedAt])
+  @@index([gender, onboardingCompletedAt])
+  @@map("user_profiles")
+}
+
+model UserPreferences {
+  userId            String                  @id @db.Uuid
+  interestedIn      Gender[]
+  ageMin            Int                     @db.SmallInt
+  ageMax            Int                     @db.SmallInt
+  maxDistanceKm     Int                     @db.SmallInt
+  /// Passport: keşfi başka bir şehirden yapma.
+  passportCity      String?
+  passportLatitude  Float?
+  passportLongitude Float?
+  /// Gelişmiş filtreler (entitlement gerektirir).
+  verifiedOnly      Boolean                 @default(false)
+  intentions        RelationshipIntention[] @default([])
+  createdAt         DateTime                @default(now())
+  updatedAt         DateTime                @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_preferences")
+}
+
+model Interest {
+  id        Int    @id @default(autoincrement())
+  slug      String @unique
+  name      String
+  category  String
+  sortOrder Int    @default(0)
+
+  users UserInterest[]
+
+  @@map("interests")
+}
+
+model UserInterest {
+  userId     String   @db.Uuid
+  interestId Int
+  createdAt  DateTime @default(now())
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  interest Interest @relation(fields: [interestId], references: [id], onDelete: Cascade)
+
+  @@id([userId, interestId])
+  @@index([interestId])
+  @@map("user_interests")
+}
+
+model UserPhoto {
+  id              String      @id @default(uuid()) @db.Uuid
+  userId          String      @db.Uuid
+  position        Int         @db.SmallInt
+  status          PhotoStatus @default(PENDING_UPLOAD)
+  uploadKey       String
+  contentType     String
+  variants        Json?
+  width           Int?
+  height          Int?
+  moderationScore Float?
+  rejectReason    String?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, position])
+  @@index([status, createdAt])
+  @@map("user_photos")
+}
+
+model OAuthAccount {
+  id                String   @id @default(uuid()) @db.Uuid
+  userId            String   @db.Uuid
+  provider          String
+  providerAccountId String
+  createdAt         DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+  @@map("oauth_accounts")
+}
+
+model Session {
+  id               String    @id @default(uuid()) @db.Uuid
+  userId           String    @db.Uuid
+  familyId         String    @db.Uuid
+  refreshTokenHash String    @unique
+  userAgent        String?
+  ip               String?
+  deviceName       String?
+  lastUsedAt       DateTime  @default(now())
+  expiresAt        DateTime
+  revokedAt        DateTime?
+  replacedById     String?   @db.Uuid
+  createdAt        DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([familyId])
+  @@map("sessions")
+}
+
+model EmailVerificationToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @db.Uuid
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("email_verification_tokens")
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @db.Uuid
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("password_reset_tokens")
+}
+
+model AuditLog {
+  id          String   @id @default(uuid()) @db.Uuid
+  actorUserId String?  @db.Uuid
+  action      String
+  targetType  String?
+  targetId    String?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  actor User? @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([actorUserId])
+  @@index([action, createdAt])
+  @@map("audit_logs")
+}

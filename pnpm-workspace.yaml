@@ -1,0 +1,17 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+
+overrides:
+  "@types/react": "19.3.0"
+
+allowBuilds:
+  "@prisma/engines": true
+  prisma: true
+  argon2: true
+  "@swc/core": true
+  "@nestjs/core": true
+  esbuild: true
+  sharp: true
+  msgpackr-extract: true
+  unrs-resolver: true

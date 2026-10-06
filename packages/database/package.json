@@ -1,0 +1,36 @@
+{
+  "name": "@dating/database",
+  "version": "0.0.0",
+  "private": true,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
+    "db:studio": "prisma studio",
+    "db:seed": "prisma db seed",
+    "build": "prisma generate && tsc -p tsconfig.json",
+    "typecheck": "prisma generate && tsc -p tsconfig.json --noEmit",
+    "lint": "eslint src"
+  },
+  "dependencies": {
+    "@prisma/adapter-pg": "7.10.0",
+    "@prisma/client": "7.10.0"
+  },
+  "devDependencies": {
+    "@dating/eslint-config": "workspace:*",
+    "@dating/tsconfig": "workspace:*",
+    "@types/node": "^26.6.4",
+    "dotenv": "^18.0.5",
+    "eslint": "^10.12.0",
+    "prisma": "7.10.0",
+    "typescript": "~6.0.3"
+  }
+}

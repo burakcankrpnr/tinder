@@ -1,0 +1,33 @@
+---
+description: Dating platform temel geliştirme kuralları (DATING_PLATFORM_SPEC.md Bölüm 46-47)
+alwaysApply: true
+---
+
+# Proje Kuralları
+
+Kaynak: `DATING_PLATFORM_SPEC.md`. Feature-by-feature ilerle; bir fazı bitirince spec'teki kutucukları `- [x]` yap.
+
+## Kod
+- TypeScript strict; `any` yok (zorunluysa gerekçesini yaz).
+- Controller ince kalır; business logic service katmanında, DB erişimi Prisma (`PrismaService`) üzerinden service içinde.
+- Validation: `packages/validation` içindeki Zod şemaları + `ZodValidationPipe`. Aynı şemayı web formlarında da kullan.
+- API yanıtı her zaman `{ success, data }` / `{ success: false, error: { code, message, requestId } }`. Hata için `AppException` fırlat, `ErrorCode` listesi `packages/types`'ta.
+- Yeni endpoint varsayılan olarak korumalıdır (global `JwtAuthGuard`); public ise `@Public()`, rol gerekiyorsa `@Roles()`. Hassas endpoint'lere `@Throttle()` ekle.
+- Schema değişikliği yalnızca migration ile: `pnpm db:migrate --name <isim>`.
+- Secret'ları koda yazma; yeni env değişkenini `packages/config` şemasına ve `.env.example`'a ekle.
+- Password, token, cookie, authorization gibi verileri loglama; public response'larda email, IP, iç ID ve skorları döndürme.
+
+## Kritik mutation'lar
+- Idempotency ve race condition'ı düşün: unique constraint, `updateMany` + `count` kontrolü veya transaction.
+- Ödeme durumu yalnızca doğrulanmış webhook ile değişir; client'a güvenme. Premium kontrolü merkezi entitlement servisiyle.
+- Realtime işlemlerde duplicate event'i önle.
+
+## Frontend
+- Mobile-first, erişilebilir (semantic HTML, aria, focus-visible).
+- Renkler yalnızca `packages/ui` token'larından (`bg-primary`, `text-text-muted`, `bg-app-gradient`); `.tsx` içinde hex renk yazma.
+
+## Her feature için sıra
+Requirements, DB model, migration, service, endpoint, validation, test, frontend query, UI, loading/error/empty state, analytics, security review, final test.
+
+## Kontrol
+`pnpm lint && pnpm typecheck && pnpm test` ve gerekiyorsa `pnpm test:e2e` (Docker servisleri açık olmalı) geçmeden iş bitmiş sayılmaz. Mevcut çalışan kodu gereksiz yere yeniden yazma.

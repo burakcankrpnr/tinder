@@ -1,0 +1,48 @@
+/*
+ * Design token'lar (DATING_PLATFORM_SPEC.md Bölüm 1).
+ * Uygulamalarda renkler yalnızca bu token'lar üzerinden kullanılmalıdır.
+ * Tailwind v4 @theme ile her token bir utility üretir: bg-primary, text-text-muted, ...
+ */
+@source "./";
+
+@theme {
+  --color-primary: #b99bfb;
+  --color-primary-strong: #9c7af2;
+  --color-primary-soft: #d8c8ff;
+  --color-accent-end: #8e6de8;
+  --color-bg-top: #645387;
+  --color-bg-mid: #3e354f;
+  --color-bg-bottom: #17151b;
+  --color-surface: #211e27;
+  --color-surface-2: #2b2733;
+  --color-text: #ffffff;
+  --color-text-muted: #aaa5b5;
+  --color-success: #35d07f;
+  --color-danger: #ff5c7a;
+  --color-warning: #ffc857;
+
+  --radius-card: 1.5rem;
+}
+
+:root {
+  --gradient-app: linear-gradient(
+    180deg,
+    var(--color-bg-top) 0%,
+    var(--color-bg-mid) 42%,
+    var(--color-bg-bottom) 100%
+  );
+  --gradient-accent: linear-gradient(
+    135deg,
+    var(--color-primary) 0%,
+    var(--color-accent-end) 100%
+  );
+  color-scheme: dark;
+}
+
+@utility bg-app-gradient {
+  background: var(--gradient-app);
+}
+
+@utility bg-accent-gradient {
+  background: var(--gradient-accent);
+}
