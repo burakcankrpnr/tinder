@@ -1,4 +1,4 @@
-import { colors } from '@/theme';
+import { ThemeProvider, useTheme } from '@/theme';
 import { useSession } from '@/session';
 import { refreshStoredLocation } from '@/place';
 import { BrandSplash } from '@/ui';
@@ -46,22 +46,33 @@ function AuthGate({ children }: { children: ReactNode }) {
 
 const queryClient = new QueryClient();
 
+function ThemedNavigation() {
+  const { scheme, colors } = useTheme();
+  return (
+    <>
+      <StatusBar style={scheme === 'light' ? 'dark' : 'light'} />
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          contentStyle: { backgroundColor: colors.bgBottom },
+        }}
+      />
+    </>
+  );
+}
+
 export default function RootLayout() {
   return (
     <SafeAreaProvider>
-      <QueryClientProvider client={queryClient}>
-        <SessionProvider>
-          <AuthGate>
-            <StatusBar style="light" />
-            <Stack
-              screenOptions={{
-                headerShown: false,
-                contentStyle: { backgroundColor: colors.bgBottom },
-              }}
-            />
-          </AuthGate>
-        </SessionProvider>
-      </QueryClientProvider>
+      <ThemeProvider>
+        <QueryClientProvider client={queryClient}>
+          <SessionProvider>
+            <AuthGate>
+              <ThemedNavigation />
+            </AuthGate>
+          </SessionProvider>
+        </QueryClientProvider>
+      </ThemeProvider>
     </SafeAreaProvider>
   );
 }

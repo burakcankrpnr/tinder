@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import type { ReactNode } from 'react';
-import { colors } from '@dating/ui/tokens';
+import { darkColors, lightColors } from '@dating/ui/tokens';
 import { publicEnv } from '@/lib/env';
 import { Providers } from './providers';
 import './globals.css';
@@ -27,8 +27,11 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: colors.bgBottom,
-  colorScheme: 'dark',
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: lightColors.bgBottom },
+    { media: '(prefers-color-scheme: dark)', color: darkColors.bgBottom },
+  ],
+  colorScheme: 'light dark',
   width: 'device-width',
   initialScale: 1,
 };

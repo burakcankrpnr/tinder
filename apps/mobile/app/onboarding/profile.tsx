@@ -4,8 +4,8 @@ import { MAX_BIO_LENGTH, MAX_INTERESTS, profileBasicsSchema } from '@dating/vali
 import { api, errorMessage } from '@/api';
 import { captureLocation } from '@/place';
 import { SelectField } from '@/select-field';
-import { colors, ui } from '@/theme';
-import { ErrorText, Field, PageHeading, PrimaryButton, Screen } from '@/ui';
+import { useTheme } from '@/theme';
+import { ErrorText, Field, PageHeading, PrimaryButton, Screen, flagMissing, showAlert } from '@/ui';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
@@ -70,6 +70,21 @@ const INTEREST_FALLBACK: Array<keyof typeof Ionicons.glyphMap> = [
   'color-wand',
 ];
 
+function missingProfileMessage(input: {
+  firstName: string;
+  username: string;
+  gender: Gender | null;
+  bio: string;
+  interests: number;
+}): string | null {
+  if (!input.firstName.trim()) return 'İsim boş bırakılamaz.';
+  if (!input.username.trim()) return 'Kullanıcı adı boş bırakılamaz.';
+  if (!input.gender) return 'Cinsiyet seçin.';
+  if (!input.bio.trim()) return 'Biyografi boş bırakılamaz.';
+  if (input.interests === 0) return 'En az bir ilgi alanı seçin.';
+  return null;
+}
+
 function interestIcon(interest: InterestDto): keyof typeof Ionicons.glyphMap {
   return INTEREST_ICONS[interest.slug] ?? INTEREST_FALLBACK[interest.id % INTEREST_FALLBACK.length] ?? 'sparkles';
 }
@@ -86,6 +101,7 @@ function profilePercent(input: { name: boolean; username: boolean; gender: boole
 }
 
 export default function OnboardingProfile() {
+  const { ui } = useTheme();
   const router = useRouter();
   const queryClient = useQueryClient();
   const me = useQuery({ queryKey: ['profile', 'me'], queryFn: () => api<MyProfileDto>('/profile/me') });
@@ -116,6 +132,13 @@ export default function OnboardingProfile() {
   });
 
   async function onSubmit() {
+    const missing = missingProfileMessage({
+      firstName,
+      username,
+      gender,
+      bio,
+      interests: selected.length,
+    });
     const parsed = profileBasicsSchema.safeParse({
       firstName,
       username,
@@ -123,8 +146,12 @@ export default function OnboardingProfile() {
       bio,
       languages: ['tr'],
     });
+    if (missing) {
+      flagMissing(setError, missing);
+      return;
+    }
     if (!parsed.success) {
-      setError(parsed.error.issues[0]?.message ?? 'Formu kontrol et.');
+      flagMissing(setError, parsed.error.issues[0]?.message ?? 'Formu kontrol et.');
       return;
     }
     setBusy(true);
@@ -132,7 +159,7 @@ export default function OnboardingProfile() {
     try {
       const place = await captureLocation(true);
       if (!place) {
-        setError('Yakınınızdaki kişileri gösterebilmek için konum izni gerekir.');
+        flagMissing(setError, 'Yakınınızdaki kişileri gösterebilmek için konum izni gerekir.');
         return;
       }
       await api('/profile/me', {
@@ -152,7 +179,9 @@ export default function OnboardingProfile() {
       await queryClient.invalidateQueries({ queryKey: ['profile', 'me'] });
       router.push('/onboarding/photos');
     } catch (caught) {
-      setError(errorMessage(caught));
+      const message = errorMessage(caught);
+      setError(message);
+      showAlert(message, 'Devam edilemedi');
     } finally {
       setBusy(false);
     }

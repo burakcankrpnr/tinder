@@ -1,11 +1,12 @@
 import { useSession } from '@/session';
 import { ErrorText, Screen, Subtitle, Title } from '@/ui';
-import { colors } from '@/theme';
+import { useTheme } from '@/theme';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect } from 'react';
 import { ActivityIndicator } from 'react-native';
 
 export default function AuthCallbackScreen() {
+  const { colors } = useTheme();
   const params = useLocalSearchParams<{ refreshToken?: string; error?: string }>();
   const { adopt } = useSession();
   const router = useRouter();

@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { InjectQueue } from '@nestjs/bullmq';
-import { HttpStatus, Injectable } from '@nestjs/common';
+import { HttpStatus, Injectable, Logger } from '@nestjs/common';
 import type { UserPhoto } from '@dating/database';
 import type { MessageDto, PhotoDto, PhotoUploadDto } from '@dating/types';
 import {
@@ -28,6 +28,8 @@ function receivedFile(file: unknown): { buffer: Buffer; size: number } | null {
 
 @Injectable()
 export class PhotosService {
+  private readonly logger = new Logger(PhotosService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly storage: StorageService,
@@ -87,6 +89,7 @@ export class PhotosService {
     if (photo.status !== 'PENDING_UPLOAD') return { message: 'Dosya alındı.' };
     const received = receivedFile(file);
     if (!received) {
+      this.logger.warn('Fotoğraf isteği dosyasız geldi');
       throw new AppException('BAD_REQUEST', 'Dosya eksik.', HttpStatus.BAD_REQUEST);
     }
     const byteLimit = photo.contentType.startsWith('video/') ? MAX_VIDEO_BYTES : MAX_PHOTO_BYTES;
@@ -94,6 +97,7 @@ export class PhotosService {
       throw new AppException('BAD_REQUEST', 'Bu dosya çok büyük.', HttpStatus.BAD_REQUEST);
     }
     await this.storage.putPrivate(photo.uploadKey, received.buffer, photo.contentType);
+    this.logger.log(`Fotoğraf dosyası kaydedildi, boyut ${received.size}`);
     return { message: 'Dosya alındı.' };
   }
 

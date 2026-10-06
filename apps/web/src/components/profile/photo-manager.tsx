@@ -166,7 +166,7 @@ export function PhotoManager() {
                 </div>
               )}
               {orderIndex === 0 && (
-                <span className="bg-accent-gradient absolute top-2 left-2 rounded-full px-2.5 py-1 text-xs font-semibold">
+                <span className="bg-accent-gradient text-on-accent absolute top-2 left-2 rounded-full px-2.5 py-1 text-xs font-semibold">
                   Ana fotoğraf
                 </span>
               )}
@@ -174,7 +174,7 @@ export function PhotoManager() {
                 <span
                   className={cx(
                     'absolute top-2 right-2 rounded-full px-2.5 py-1 text-xs',
-                    photo.status === 'REJECTED' ? 'bg-danger/90' : 'bg-bg-bottom/80',
+                    photo.status === 'REJECTED' ? 'bg-danger/90 text-on-accent' : 'bg-bg-bottom/80',
                   )}
                 >
                   {STATUS_LABELS[photo.status]}

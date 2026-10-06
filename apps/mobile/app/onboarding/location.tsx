@@ -1,6 +1,6 @@
 import type { OnboardingStep } from '@dating/types';
 import { ApiError, api, errorMessage } from '@/api';
-import { ErrorText, PageHeading, PrimaryButton, Screen, StepBack } from '@/ui';
+import { ErrorText, PageHeading, PrimaryButton, Screen, StepBack, flagMissing, showAlert } from '@/ui';
 import { useQueryClient } from '@tanstack/react-query';
 import * as Location from 'expo-location';
 import { Stack, useRouter } from 'expo-router';
@@ -18,7 +18,7 @@ export default function OnboardingLocation() {
     try {
       const permission = await Location.requestForegroundPermissionsAsync();
       if (!permission.granted) {
-        setError('Konum izni olmadan keşif açılamaz.');
+        flagMissing(setError, 'Konum izni olmadan keşif açılamaz.');
         return;
       }
       const position = await Location.getCurrentPositionAsync({});
@@ -32,10 +32,21 @@ export default function OnboardingLocation() {
     } catch (caught) {
       const step = caught instanceof ApiError ? caught.details?.find((item) => item.path === 'onboarding')?.message : undefined;
       if (step === 'profile' || step === 'photos' || step === 'preferences' || step === 'location') {
+        const message =
+          step === 'photos'
+            ? 'Devam etmek için en az bir profil fotoğrafı ekleyin.'
+            : step === 'profile'
+              ? 'Devam etmek için profil bilgilerini doldurun.'
+              : step === 'preferences'
+                ? 'Devam etmek için keşif tercihlerini doldurun.'
+                : 'Devam etmek için konum izni gerekir.';
+        flagMissing(setError, message);
         router.replace(`/onboarding/${step as OnboardingStep}`);
         return;
       }
-      setError(errorMessage(caught));
+      const message = errorMessage(caught);
+      setError(message);
+      showAlert(message, 'Devam edilemedi');
     } finally {
       setBusy(false);
     }

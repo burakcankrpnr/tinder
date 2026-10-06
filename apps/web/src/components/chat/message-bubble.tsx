@@ -7,9 +7,14 @@ import { formatTime } from '@/lib/format';
 import { CheckIcon, MoreIcon } from '../icons';
 import { Menu, type MenuItem } from '../menu';
 
-function Ticks({ read }: { read: boolean }) {
+function Ticks({ read, onAccent }: { read: boolean; onAccent: boolean }) {
   return (
-    <span className={cx('inline-flex', read ? 'text-primary-soft' : 'text-text/60')}>
+    <span
+      className={cx(
+        'inline-flex',
+        read ? (onAccent ? 'text-on-accent' : 'text-primary-soft') : onAccent ? 'text-on-accent/70' : 'text-text/60',
+      )}
+    >
       <CheckIcon className="size-3.5" />
       {read && <CheckIcon className="-ml-2 size-3.5" />}
       <span className="sr-only">{read ? 'Okundu' : 'Gönderildi'}</span>
@@ -20,7 +25,7 @@ function Ticks({ read }: { read: boolean }) {
 function bubbleClasses(mine: boolean): string {
   return cx(
     'max-w-[80%] rounded-3xl px-4 py-2.5 text-sm shadow-sm',
-    mine ? 'bg-accent-gradient text-text rounded-br-lg' : 'bg-surface-2 text-text rounded-bl-lg',
+    mine ? 'bg-accent-gradient text-on-accent rounded-br-lg' : 'bg-surface-2 text-text rounded-bl-lg',
   );
 }
 
@@ -40,7 +45,7 @@ export function MessageBubble({
     <div className={cx('group flex items-end gap-1', mine ? 'flex-row-reverse' : 'flex-row')}>
       <div className={bubbleClasses(mine)}>
         {message.deleted ? (
-          <p className="text-text/70 italic">Bu mesaj silindi</p>
+          <p className={cx('italic', mine ? 'text-on-accent/70' : 'text-text/70')}>Bu mesaj silindi</p>
         ) : message.image ? (
           <a href={message.image.url} target="_blank" rel="noreferrer" className="block">
             <img
@@ -55,9 +60,9 @@ export function MessageBubble({
         ) : (
           <p className="whitespace-pre-wrap break-words">{message.body}</p>
         )}
-        <p className={cx('mt-1 flex items-center justify-end gap-1 text-[11px]', mine ? 'text-text/80' : 'text-text-muted')}>
+        <p className={cx('mt-1 flex items-center justify-end gap-1 text-[11px]', mine ? 'text-on-accent/80' : 'text-text-muted')}>
           <time dateTime={message.createdAt}>{formatTime(message.createdAt)}</time>
-          {mine && showReadState && <Ticks read={message.readAt !== null} />}
+          {mine && showReadState && <Ticks read={message.readAt !== null} onAccent />}
         </p>
       </div>
       {!message.deleted && actions.length > 0 && (
@@ -92,7 +97,7 @@ export function PendingBubble({
         ) : (
           <p className="whitespace-pre-wrap break-words">{message.body}</p>
         )}
-        <p className="text-text/80 mt-1 text-right text-[11px]">{failed ? 'Gönderilemedi' : 'Gönderiliyor…'}</p>
+        <p className="text-on-accent/80 mt-1 text-right text-[11px]">{failed ? 'Gönderilemedi' : 'Gönderiliyor…'}</p>
       </div>
       {failed && (
         <p className="text-danger flex items-center gap-3 text-xs" role="alert">

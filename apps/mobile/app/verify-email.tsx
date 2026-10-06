@@ -1,11 +1,12 @@
 import { verifyEmailSchema } from '@dating/validation';
 import { api, errorMessage } from '@/api';
 import { ErrorText, PrimaryButton, Screen, Subtitle, Title } from '@/ui';
-import { colors } from '@/theme';
+import { useTheme } from '@/theme';
 import { Link, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 
 export default function VerifyEmailScreen() {
+  const { colors } = useTheme();
   const params = useLocalSearchParams<{ token?: string }>();
   const token = typeof params.token === 'string' ? params.token : '';
   const [error, setError] = useState<string | null>(token ? null : 'Bağlantı geçersiz.');

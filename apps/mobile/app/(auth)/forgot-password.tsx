@@ -1,11 +1,12 @@
 import { emailOnlySchema } from '@dating/validation';
 import { api, errorMessage } from '@/api';
-import { ErrorText, Field, Notice, PageHeading, PrimaryButton, Screen } from '@/ui';
-import { colors } from '@/theme';
+import { ErrorText, Field, Notice, PageHeading, PrimaryButton, Screen, flagMissing } from '@/ui';
+import { useTheme } from '@/theme';
 import { Link } from 'expo-router';
 import { useState } from 'react';
 
 export default function ForgotPasswordScreen() {
+  const { colors } = useTheme();
   const [email, setEmail] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
@@ -14,7 +15,7 @@ export default function ForgotPasswordScreen() {
   async function onSubmit() {
     const parsed = emailOnlySchema.safeParse({ email });
     if (!parsed.success) {
-      setError(parsed.error.issues[0]?.message ?? 'Email gerekli.');
+      flagMissing(setError, !email.trim() ? 'E-posta boş bırakılamaz.' : (parsed.error.issues[0]?.message ?? 'E-posta gerekli.'));
       return;
     }
     setBusy(true);

@@ -20,6 +20,8 @@
   --color-success: #35d07f;
   --color-danger: #ff5c7a;
   --color-warning: #ffc857;
+  --color-on-accent: #ffffff;
+  --color-scrim: #0c0a10;
 
   --radius-card: 1.5rem;
 }
@@ -37,6 +39,29 @@
     var(--color-accent-end) 100%
   );
   color-scheme: dark;
+}
+
+/* Cihaz aydınlık temayı seçtiğinde token'lar açılır. Utility'ler var(--color-*) kullandığı için sayfalar birlikte değişir. */
+@media (prefers-color-scheme: light) {
+  :root {
+    --color-primary: #6844c0;
+    --color-primary-strong: #542fa8;
+    --color-primary-soft: #4c2c96;
+    --color-accent-end: #7a52d0;
+    --color-bg-top: #f7f3fc;
+    --color-bg-mid: #efe7f8;
+    --color-bg-bottom: #f4effa;
+    --color-surface: #ffffff;
+    --color-surface-2: #efe8f7;
+    --color-text: #1b1526;
+    --color-text-muted: #5c546b;
+    --color-success: #0e7a46;
+    --color-danger: #c42342;
+    --color-warning: #8a5b00;
+    --color-on-accent: #ffffff;
+    --color-scrim: #1b1526;
+    color-scheme: light;
+  }
 }
 
 @utility bg-app-gradient {

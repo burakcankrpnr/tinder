@@ -2,8 +2,8 @@ import type { PhotoDto } from '@dating/types';
 import { Ionicons } from '@expo/vector-icons';
 import { MAX_VIDEO_SECONDS, MEDIA_CONTENT_TYPES, type MediaContentType } from '@dating/validation';
 import { api, deviceUrl, errorMessage, uploadPhotoContent } from '@/api';
-import { ErrorText, PageHeading, PrimaryButton, Screen, SecondaryButton, StepBack } from '@/ui';
-import { colors, ui } from '@/theme';
+import { ErrorText, PageHeading, PrimaryButton, Screen, SecondaryButton, StepBack, flagMissing, showAlert } from '@/ui';
+import { useTheme } from '@/theme';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
 import { useVideoPlayer, VideoView } from 'expo-video';
@@ -46,6 +46,7 @@ async function byteSize(uri: string, known: number | null | undefined): Promise<
 }
 
 export default function OnboardingPhotos() {
+  const { colors, ui } = useTheme();
   const router = useRouter();
   const queryClient = useQueryClient();
   const photos = useQuery({ queryKey: ['photos'], queryFn: () => api<PhotoDto[]>('/photos') });
@@ -62,12 +63,12 @@ export default function OnboardingPhotos() {
 
   async function addPhoto() {
     if (ordered.length >= SLOT_COUNT) {
-      setError('En fazla 9 fotoğraf ekleyebilirsiniz.');
+      flagMissing(setError, 'En fazla 9 fotoğraf ekleyebilirsiniz.');
       return;
     }
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
-      setError('Fotoğraf eklemek için galeri izni gerekir.');
+      flagMissing(setError, 'Fotoğraf eklemek için galeri izni gerekir.');
       return;
     }
     const picked = await ImagePicker.launchImageLibraryAsync({
@@ -81,12 +82,12 @@ export default function OnboardingPhotos() {
     const video = asset.type === 'video' || isVideoType(asset.mimeType);
     const seconds = secondsOf(asset.duration);
     if (video && seconds !== null && seconds > MAX_VIDEO_SECONDS) {
-      setError('Video en fazla 15 saniye olabilir.');
+      flagMissing(setError, 'Video en fazla 15 saniye olabilir.');
       return;
     }
     const contentType = mediaTypeOf(asset.mimeType) ?? (video ? 'video/mp4' : 'image/jpeg');
     if (!video && asset.mimeType && !mediaTypeOf(asset.mimeType)) {
-      setError('Fotoğraf veya en fazla 15 saniyelik video seçin.');
+      flagMissing(setError, 'Fotoğraf veya en fazla 15 saniyelik video seçin.');
       return;
     }
     setBusy(true);
@@ -106,7 +107,9 @@ export default function OnboardingPhotos() {
       setLocalUris((current) => ({ ...current, [created.photo.id]: asset.uri }));
       await refresh();
     } catch (caught) {
-      setError(errorMessage(caught));
+      const message = errorMessage(caught);
+      setError(message);
+      showAlert(message, 'Fotoğraf eklenemedi');
     } finally {
       setBusy(false);
     }
@@ -247,7 +250,22 @@ export default function OnboardingPhotos() {
       ) : (
         busy ? <Text style={[ui.hint, ui.centered]}>Yükleniyor.</Text> : null
       )}
-      <PrimaryButton label="Devam et" disabled={!ready || busy} onPress={() => router.replace('/onboarding/preferences')} />
+      <PrimaryButton
+        label="Devam et"
+        disabled={busy}
+        onPress={() => {
+          if (!ready) {
+            flagMissing(
+              setError,
+              ordered.some((photo) => photo.status === 'REJECTED')
+                ? 'Devam etmek için uygun bir profil fotoğrafı ekleyin.'
+                : 'Devam etmek için en az bir profil fotoğrafı ekleyin.',
+            );
+            return;
+          }
+          router.replace('/onboarding/preferences');
+        }}
+      />
     </Screen>
   );
 }

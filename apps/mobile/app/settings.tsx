@@ -1,7 +1,7 @@
 import { DELETE_ACCOUNT_CONFIRMATION, deleteAccountSchema } from '@dating/validation';
 import { api, errorMessage } from '@/api';
 import { useSession } from '@/session';
-import { ErrorText, Field, PrimaryButton, Screen, SecondaryButton, Subtitle, Title } from '@/ui';
+import { ErrorText, Field, PrimaryButton, Screen, SecondaryButton, Subtitle, Title, flagMissing } from '@/ui';
 import { useState } from 'react';
 
 export default function SettingsScreen() {
@@ -14,7 +14,14 @@ export default function SettingsScreen() {
   async function onDelete() {
     const parsed = deleteAccountSchema.safeParse({ password, confirmation });
     if (!parsed.success) {
-      setError(parsed.error.issues[0]?.message ?? 'Onayı kontrol et.');
+      flagMissing(
+        setError,
+        !password
+          ? 'Şifre boş bırakılamaz.'
+          : !confirmation.trim()
+            ? 'Onay boş bırakılamaz.'
+            : (parsed.error.issues[0]?.message ?? 'Onayı kontrol et.'),
+      );
       return;
     }
     setBusy(true);

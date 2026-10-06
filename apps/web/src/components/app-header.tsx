@@ -17,7 +17,7 @@ const NAV = [
 function Badge({ count, label }: { count: number; label: string }) {
   if (count <= 0) return null;
   return (
-    <span className="bg-danger text-text ml-1 inline-flex min-w-5 items-center justify-center rounded-full px-1.5 text-[11px] font-bold leading-5">
+    <span className="bg-danger text-on-accent ml-1 inline-flex min-w-5 items-center justify-center rounded-full px-1.5 text-[11px] font-bold leading-5">
       {count > 99 ? '99+' : count}
       <span className="sr-only"> {label}</span>
     </span>

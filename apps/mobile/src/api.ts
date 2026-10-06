@@ -1,4 +1,5 @@
 import type { ApiErrorBody, ApiResponse, AuthResultDto, ErrorCode } from '@dating/types';
+import { File, UploadType, type UploadResult } from 'expo-file-system';
 import * as SecureStore from 'expo-secure-store';
 
 const API_ORIGIN = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:4000';
@@ -177,40 +178,49 @@ export async function uploadPhotoContent(
   photoId: string,
   file: { uri: string; name: string; type: string },
 ): Promise<void> {
-  const post = async (): Promise<Response> => {
-    const form = new FormData();
-    form.append('file', asFormFile(file));
+  const post = async (): Promise<UploadResult> => {
     const headers: Record<string, string> = { Accept: 'application/json', 'X-Client': 'mobile' };
     if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
-    return fetch(`${API_BASE}/photos/${photoId}/content`, { method: 'POST', headers, body: form });
+    return new File(file.uri).upload(`${API_BASE}/photos/${photoId}/content`, {
+      httpMethod: 'POST',
+      uploadType: UploadType.MULTIPART,
+      fieldName: 'file',
+      mimeType: file.type,
+      headers,
+    });
   };
 
-  let response: Response;
+  let result: UploadResult;
   try {
-    response = await post();
-  } catch {
+    result = await post();
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : 'bağlantı koptu';
+    console.warn(`photo-upload: ${detail}`);
     throw new ApiError('NETWORK_ERROR', 'Fotoğraf sunucuya ulaşamadı. Telefon ve bilgisayar aynı Wi-Fi ağında olmalı.', 0);
   }
-  if (response.status === 401 && accessToken) {
+  if (result.status === 401 && accessToken) {
     const refreshed = await refreshSession();
     if (refreshed) {
       try {
-        response = await post();
-      } catch {
+        result = await post();
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : 'bağlantı koptu';
+        console.warn(`photo-upload: ${detail}`);
         throw new ApiError('NETWORK_ERROR', 'Fotoğraf sunucuya ulaşamadı. Telefon ve bilgisayar aynı Wi-Fi ağında olmalı.', 0);
       }
     }
   }
+  if (result.status === 0) {
+    console.warn('photo-upload: sunucu yanıt vermedi');
+    throw new ApiError('NETWORK_ERROR', 'Fotoğraf sunucuya ulaşamadı. Telefon ve bilgisayar aynı Wi-Fi ağında olmalı.', 0);
+  }
 
   let body: ApiResponse<{ message: string }>;
   try {
-    body = (await response.json()) as ApiResponse<{ message: string }>;
+    body = JSON.parse(result.body) as ApiResponse<{ message: string }>;
   } catch {
-    throw new ApiError('INTERNAL_ERROR', 'Beklenmeyen bir yanıt alındı.', response.status);
+    console.warn(`photo-upload: geçersiz yanıt ${result.status}`);
+    throw new ApiError('INTERNAL_ERROR', 'Beklenmeyen bir yanıt alındı.', result.status);
   }
-  if (!body.success) throw new ApiError(body.error.code, body.error.message, response.status, body.error.details);
-}
-
-function asFormFile(file: { uri: string; name: string; type: string }): Blob {
-  return file as unknown as Blob;
+  if (!body.success) throw new ApiError(body.error.code, body.error.message, result.status, body.error.details);
 }

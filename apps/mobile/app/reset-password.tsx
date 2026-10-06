@@ -1,11 +1,12 @@
 import { resetPasswordSchema } from '@dating/validation';
 import { api, errorMessage } from '@/api';
-import { ErrorText, Field, PrimaryButton, Screen, Subtitle, Title } from '@/ui';
-import { colors } from '@/theme';
+import { ErrorText, Field, PrimaryButton, Screen, Subtitle, Title, flagMissing } from '@/ui';
+import { useTheme } from '@/theme';
 import { Link, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 
 export default function ResetPasswordScreen() {
+  const { colors } = useTheme();
   const params = useLocalSearchParams<{ token?: string }>();
   const token = typeof params.token === 'string' ? params.token : '';
   const [password, setPassword] = useState('');
@@ -16,7 +17,10 @@ export default function ResetPasswordScreen() {
   async function onSubmit() {
     const parsed = resetPasswordSchema.safeParse({ token, password });
     if (!parsed.success) {
-      setError(parsed.error.issues[0]?.message ?? 'Şifreyi kontrol et.');
+      flagMissing(
+        setError,
+        !token ? 'Bağlantı geçersiz.' : !password ? 'Şifre boş bırakılamaz.' : (parsed.error.issues[0]?.message ?? 'Şifreyi kontrol et.'),
+      );
       return;
     }
     setBusy(true);

@@ -157,7 +157,7 @@ export function SwipeCard({
 
       <div className="from-bg-bottom via-bg-bottom/70 absolute inset-x-0 bottom-0 space-y-2 bg-gradient-to-t to-transparent p-5 pt-24">
         {card.superLikedYou && (
-          <span className="bg-accent-gradient inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold">
+          <span className="bg-accent-gradient text-on-accent inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold">
             <span aria-hidden>★</span> Seni Super Like’ladı
           </span>
         )}

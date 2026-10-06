@@ -39,7 +39,7 @@ export function Modal({
       }}
       className={cx(
         'bg-surface text-text m-auto w-[calc(100%-2rem)] max-w-lg rounded-card border border-text/10 p-0 shadow-2xl',
-        'backdrop:bg-bg-bottom/80 backdrop:backdrop-blur-sm',
+        'backdrop:bg-scrim/70 backdrop:backdrop-blur-sm',
         className,
       )}
     >

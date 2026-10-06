@@ -1,15 +1,16 @@
 import { loginSchema } from '@dating/validation';
 import { ApiError, errorMessage, googleStartUrl } from '@/api';
 import { useSession } from '@/session';
-import { ErrorText, Field, GoogleButton, Notice, OrDivider, PageHeading, PrimaryButton, Screen } from '@/ui';
+import { ErrorText, Field, GoogleButton, Notice, OrDivider, PageHeading, PrimaryButton, Screen, flagMissing, showAlert } from '@/ui';
 import * as WebBrowser from 'expo-web-browser';
 import { Link, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { colors } from '@/theme';
+import { useTheme } from '@/theme';
 
 WebBrowser.maybeCompleteAuthSession();
 
 export default function LoginScreen() {
+  const { colors } = useTheme();
   const { login, adopt } = useSession();
   const verified = useLocalSearchParams<{ verified?: string }>().verified === '1';
   const [email, setEmail] = useState('');
@@ -20,7 +21,10 @@ export default function LoginScreen() {
   async function onSubmit() {
     const parsed = loginSchema.safeParse({ email, password });
     if (!parsed.success) {
-      setError(parsed.error.issues[0]?.message ?? 'Formu kontrol et.');
+      flagMissing(
+        setError,
+        !email.trim() ? 'E-posta boş bırakılamaz.' : !password ? 'Şifre boş bırakılamaz.' : (parsed.error.issues[0]?.message ?? 'Formu kontrol et.'),
+      );
       return;
     }
     setBusy(true);
@@ -29,9 +33,13 @@ export default function LoginScreen() {
       await login(parsed.data);
     } catch (caught) {
       if (caught instanceof ApiError && caught.code === 'EMAIL_NOT_VERIFIED') {
-        setError('E-postan henüz doğrulanmadı. Gelen kutundaki bağlantıya dokun, sonra tekrar giriş yap.');
+        const message = 'E-postan henüz doğrulanmadı. Gelen kutundaki bağlantıya dokun, sonra tekrar giriş yap.';
+        setError(message);
+        showAlert(message, 'E-posta doğrulanmadı');
       } else {
-        setError(errorMessage(caught));
+        const message = errorMessage(caught);
+        setError(message);
+        showAlert(message, 'Giriş yapılamadı');
       }
     } finally {
       setBusy(false);

@@ -1,11 +1,12 @@
 import { registerSchema } from '@dating/validation';
 import { api, errorMessage } from '@/api';
-import { ErrorText, Field, Notice, PageHeading, PrimaryButton, Screen } from '@/ui';
-import { colors } from '@/theme';
+import { ErrorText, Field, Notice, PageHeading, PrimaryButton, Screen, flagMissing } from '@/ui';
+import { useTheme } from '@/theme';
 import { Link } from 'expo-router';
 import { useState } from 'react';
 
 export default function RegisterScreen() {
+  const { colors } = useTheme();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [birthDate, setBirthDate] = useState('');
@@ -16,7 +17,14 @@ export default function RegisterScreen() {
   async function onSubmit() {
     const parsed = registerSchema.safeParse({ email, password, birthDate });
     if (!parsed.success) {
-      setError(parsed.error.issues[0]?.message ?? 'Formu kontrol et.');
+      const message = !email.trim()
+        ? 'E-posta boş bırakılamaz.'
+        : !password
+          ? 'Şifre boş bırakılamaz.'
+          : !birthDate.trim()
+            ? 'Doğum tarihi boş bırakılamaz.'
+            : (parsed.error.issues[0]?.message ?? 'Formu kontrol et.');
+      flagMissing(setError, message);
       return;
     }
     setBusy(true);

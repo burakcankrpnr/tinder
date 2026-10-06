@@ -244,7 +244,7 @@ export function DiscoverDeck() {
               aria-label="Beğen (sağ ok)"
               disabled={!current}
               onClick={() => act('LIKE')}
-              className="bg-accent-gradient text-text focus-visible:outline-primary flex size-20 items-center justify-center rounded-full text-3xl shadow-xl transition hover:brightness-110 focus-visible:outline-2 disabled:opacity-40"
+              className="bg-accent-gradient text-on-accent focus-visible:outline-primary flex size-20 items-center justify-center rounded-full text-3xl shadow-xl transition hover:brightness-110 focus-visible:outline-2 disabled:opacity-40"
             >
               ♥
             </button>

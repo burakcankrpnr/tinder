@@ -1,7 +1,7 @@
 import type { CatalogDto, CheckoutDto, EntitlementsDto } from '@dating/types';
 import { api, errorMessage } from '@/api';
 import { ErrorText, PrimaryButton, Screen, Subtitle, Title } from '@/ui';
-import { colors, ui } from '@/theme';
+import { useTheme } from '@/theme';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import * as Crypto from 'expo-crypto';
 import { useState } from 'react';
@@ -12,6 +12,7 @@ function formatPrice(amount: number, currency: string): string {
 }
 
 export default function SubscriptionScreen() {
+  const { colors, ui } = useTheme();
   const queryClient = useQueryClient();
   const plans = useQuery({ queryKey: ['plans'], queryFn: () => api<CatalogDto>('/billing/plans') });
   const entitlements = useQuery({

@@ -26,7 +26,7 @@ function IntervalToggle({
           onClick={() => onChange(interval)}
           className={cx(
             'focus-visible:outline-primary rounded-full px-4 py-2 text-sm font-medium transition focus-visible:outline-2',
-            value === interval ? 'bg-primary-strong text-text' : 'text-text-muted hover:text-text',
+            value === interval ? 'bg-primary-strong text-on-accent' : 'text-text-muted hover:text-text',
           )}
         >
           {INTERVAL_LABELS[interval]}
@@ -109,7 +109,7 @@ export function PlanComparison({ mode, highlight = 'premium' }: { mode: 'public'
                   {current ? (
                     <span className="bg-primary/20 text-primary-soft rounded-full px-2 py-0.5 text-xs">Mevcut paket</span>
                   ) : featured ? (
-                    <span className="bg-accent-gradient rounded-full px-2 py-0.5 text-xs font-semibold">En popüler</span>
+                    <span className="bg-accent-gradient text-on-accent rounded-full px-2 py-0.5 text-xs font-semibold">En popüler</span>
                   ) : null}
                 </div>
                 {plan.description && <p className="text-text-muted text-sm">{plan.description}</p>}

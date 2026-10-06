@@ -1,6 +1,6 @@
 import type { ChatMessageDto, MessagePageDto } from '@dating/types';
 import { api, errorMessage } from '@/api';
-import { colors, ui } from '@/theme';
+import { useTheme } from '@/theme';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import * as Crypto from 'expo-crypto';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -9,6 +9,7 @@ import { FlatList, Pressable, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function ChatScreen() {
+  const { colors, ui } = useTheme();
   const { matchId } = useLocalSearchParams<{ matchId: string }>();
   const id = typeof matchId === 'string' ? matchId : '';
   const router = useRouter();

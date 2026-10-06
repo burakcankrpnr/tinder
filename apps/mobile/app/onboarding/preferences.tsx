@@ -2,9 +2,22 @@ import type { Gender } from '@dating/types';
 import { preferencesSchema } from '@dating/validation';
 import { api, errorMessage } from '@/api';
 import { SelectField } from '@/select-field';
-import { ErrorText, Field, PageHeading, PrimaryButton, Screen, StepBack } from '@/ui';
+import { ErrorText, Field, PageHeading, PrimaryButton, Screen, StepBack, flagMissing, showAlert } from '@/ui';
 import { Stack, useRouter } from 'expo-router';
 import { useState } from 'react';
+
+function emptyPreferenceMessage(
+  interestedIn: readonly Gender[],
+  ageMin: string,
+  ageMax: string,
+  distance: string,
+): string | null {
+  if (interestedIn.length === 0) return 'Devam etmek için en az bir seçenek işaretleyin.';
+  if (!ageMin.trim()) return 'Minimum yaş boş bırakılamaz.';
+  if (!ageMax.trim()) return 'Maksimum yaş boş bırakılamaz.';
+  if (!distance.trim()) return 'Mesafe boş bırakılamaz.';
+  return null;
+}
 
 const OPTIONS = [
   { value: 'WOMAN', label: 'Kadınlar', icon: 'female' as const },
@@ -29,7 +42,12 @@ export default function OnboardingPreferences() {
       maxDistanceKm: distance,
     });
     if (!parsed.success) {
-      setError(parsed.error.issues[0]?.message ?? 'Tercihleri kontrol et.');
+      flagMissing(
+        setError,
+        emptyPreferenceMessage(interestedIn, ageMin, ageMax, distance) ??
+          parsed.error.issues[0]?.message ??
+          'Tercihleri kontrol et.',
+      );
       return;
     }
     setBusy(true);
@@ -38,7 +56,9 @@ export default function OnboardingPreferences() {
       await api('/profile/me/preferences', { method: 'PUT', body: parsed.data });
       router.replace('/onboarding/location');
     } catch (caught) {
-      setError(errorMessage(caught));
+      const message = errorMessage(caught);
+      setError(message);
+      showAlert(message, 'Devam edilemedi');
     } finally {
       setBusy(false);
     }

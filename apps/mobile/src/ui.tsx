@@ -1,11 +1,13 @@
-import { useContext, useEffect, useRef, useState } from 'react';
+import { useContext, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Dimensions,
   Keyboard,
   Platform,
   Pressable,
   ScrollView,
+  StyleSheet,
   Text,
   TextInput,
   View,
@@ -13,13 +15,21 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { SafeAreaView, type Edges } from 'react-native-safe-area-context';
-import { FieldScrollContext, setActiveMenu, type ScrollMode } from './field-scroll';
-import { colors, ui } from './theme';
+import { SafeAreaView, useSafeAreaInsets, type Edges } from 'react-native-safe-area-context';
+import {
+  FieldScrollContext,
+  menuStore,
+  requestMenuMeasure,
+  setActiveMenu,
+  setMenuMeasurer,
+  type ScrollMode,
+} from './field-scroll';
+import { useTheme } from './theme';
 
 export { setActiveMenu, subscribeActiveMenu, useRevealField } from './field-scroll';
 
 function ScrollThumb({ bar }: { bar: { view: number; content: number; offset: number } }) {
+  const { colors } = useTheme();
   const overflow = bar.content - bar.view;
   if (bar.view <= 0 || overflow <= 12) return null;
   const height = Math.max(28, (bar.view / bar.content) * bar.view);
@@ -40,7 +50,87 @@ function ScrollThumb({ bar }: { bar: { view: number; content: number; offset: nu
   );
 }
 
+function MenuLayer({ keyboardInset }: { keyboardInset: number }) {
+  const host = useRef<View>(null);
+  const frames = useSyncExternalStore(menuStore.subscribe, menuStore.getSnapshot, menuStore.getSnapshot);
+  const [boxes, setBoxes] = useState<Record<string, { top: number; left: number; width: number; maxHeight: number }>>({});
+
+  const measure = useRef(() => {});
+  measure.current = () => {
+    host.current?.measureInWindow((originX, originY) => {
+      if (frames.length === 0) {
+        setBoxes((current) => (Object.keys(current).length === 0 ? current : {}));
+        return;
+      }
+      frames.forEach((frame) => {
+        frame.anchor.current?.measureInWindow((x, y, width, height) => {
+          const top = y + height + 6 - originY;
+          const space = Dimensions.get('window').height - keyboardInset - (y + height) - 16;
+          const next = {
+            top,
+            left: x - originX,
+            width,
+            maxHeight: Math.min(220, Math.max(96, space)),
+          };
+          setBoxes((current) => {
+            const prev = current[frame.id];
+            if (
+              prev &&
+              prev.top === next.top &&
+              prev.left === next.left &&
+              prev.width === next.width &&
+              prev.maxHeight === next.maxHeight
+            ) {
+              return current;
+            }
+            return { ...current, [frame.id]: next };
+          });
+        });
+      });
+    });
+  };
+
+  useLayoutEffect(() => {
+    measure.current();
+  }, [frames, keyboardInset]);
+
+  useEffect(() => setMenuMeasurer(() => measure.current()), []);
+
+  return (
+    <View
+      ref={host}
+      pointerEvents={frames.length === 0 ? 'none' : 'box-none'}
+      style={StyleSheet.absoluteFill}
+      collapsable={false}
+    >
+      {frames.map((frame) => {
+        const box = boxes[frame.id];
+        if (!box) return null;
+        return (
+          <View
+            key={frame.id}
+            style={{
+              position: 'absolute',
+              top: box.top,
+              left: box.left,
+              width: box.width,
+              maxHeight: box.maxHeight,
+              zIndex: 40,
+              elevation: 18,
+              overflow: 'hidden',
+            }}
+          >
+            {frame.render()}
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
 export function Screen({ children, header = false }: { children: React.ReactNode; header?: boolean }) {
+  const { ui } = useTheme();
+  const insets = useSafeAreaInsets();
   const scrollRef = useRef<ScrollView>(null);
   const offset = useRef(0);
   const keyboardHeight = useRef(0);
@@ -48,7 +138,7 @@ export function Screen({ children, header = false }: { children: React.ReactNode
   const pending = useRef<{ target: View; mode: ScrollMode } | null>(null);
   const [keyboardPad, setKeyboardPad] = useState(0);
   const [bar, setBar] = useState({ view: 0, content: 0, offset: 0 });
-  const edges: Edges = header ? ['left', 'right', 'bottom'] : ['top', 'left', 'right', 'bottom'];
+  const edges: Edges = header ? ['bottom'] : ['top', 'bottom'];
 
   function reveal(target: View | null, mode: ScrollMode) {
     if (!target) return;
@@ -60,6 +150,7 @@ export function Screen({ children, header = false }: { children: React.ReactNode
       if (overflow > 8) {
         scrollRef.current?.scrollTo({ y: offset.current + overflow, animated: true });
       }
+      requestMenuMeasure();
     });
   }
 
@@ -85,7 +176,7 @@ export function Screen({ children, header = false }: { children: React.ReactNode
 
   return (
     <FieldScrollContext.Provider value={reveal}>
-      <SafeAreaView edges={edges} style={ui.screen}>
+      <SafeAreaView edges={edges} style={[ui.screen, { paddingHorizontal: 0 }]}>
         <View style={{ flex: 1 }}>
           <ScrollView
             ref={scrollRef}
@@ -104,14 +195,23 @@ export function Screen({ children, header = false }: { children: React.ReactNode
               const next = event.nativeEvent.contentOffset.y;
               offset.current = next;
               setBar((current) => ({ ...current, offset: next }));
+              requestMenuMeasure();
             }}
             scrollEventThrottle={16}
-            contentContainerStyle={[ui.screenContent, { paddingBottom: keyboardPad + 28, paddingRight: 8 }]}
+            contentContainerStyle={[
+              ui.screenContent,
+              {
+                paddingBottom: keyboardPad + 28,
+                paddingLeft: 20 + insets.left,
+                paddingRight: 20 + insets.right,
+              },
+            ]}
           >
             <Pressable accessible={false} onPress={Keyboard.dismiss} style={{ gap: 22 }}>
               {children}
             </Pressable>
           </ScrollView>
+          <MenuLayer keyboardInset={keyboardPad} />
           <ScrollThumb bar={bar} />
         </View>
       </SafeAreaView>
@@ -120,10 +220,12 @@ export function Screen({ children, header = false }: { children: React.ReactNode
 }
 
 export function Title({ children }: { children: React.ReactNode }) {
+  const { ui } = useTheme();
   return <Text style={ui.title}>{children}</Text>;
 }
 
 export function Subtitle({ children }: { children: React.ReactNode }) {
+  const { ui } = useTheme();
   return <Text style={ui.subtitle}>{children}</Text>;
 }
 
@@ -132,6 +234,7 @@ export function StepBack({
 }: {
   href: '/onboarding/profile' | '/onboarding/photos' | '/onboarding/preferences';
 }) {
+  const { colors } = useTheme();
   const router = useRouter();
   return (
     <Pressable accessibilityRole="button" accessibilityLabel="Geri" hitSlop={12} onPress={() => router.replace(href)}>
@@ -149,10 +252,11 @@ export function PageHeading({
   title: string;
   subtitle: string;
 }) {
+  const { colors, ui } = useTheme();
   return (
     <View style={{ gap: 10, alignItems: 'center' }}>
       <View style={ui.pageIcon}>
-        <Ionicons name={icon} size={26} color={colors.bgBottom} />
+        <Ionicons name={icon} size={26} color={colors.onAccent} />
       </View>
       <Text style={[ui.title, ui.centered]}>{title}</Text>
       <Text style={[ui.subtitle, ui.centered]}>{subtitle}</Text>
@@ -161,10 +265,11 @@ export function PageHeading({
 }
 
 export function BrandSplash({ message = 'Hesabın hazırlanıyor' }: { message?: string }) {
+  const { colors, ui } = useTheme();
   return (
     <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16, backgroundColor: colors.bgBottom, paddingHorizontal: 32 }}>
       <View style={ui.brandMark}>
-        <Ionicons name="flame" size={44} color={colors.bgBottom} />
+        <Ionicons name="flame" size={44} color={colors.onAccent} />
       </View>
       <Text style={[ui.title, ui.centered]}>Dating</Text>
       <Text style={[ui.subtitle, ui.centered]}>{message}</Text>
@@ -181,6 +286,7 @@ export function Field({
   secureTextEntry,
   ...props
 }: { label: string; icon?: keyof typeof Ionicons.glyphMap; hint?: string; error?: string } & TextInputProps) {
+  const { colors, ui } = useTheme();
   const [hidden, setHidden] = useState(Boolean(secureTextEntry));
   const masked = Boolean(secureTextEntry) && hidden;
   const box = useRef<View>(null);
@@ -234,6 +340,7 @@ export function PrimaryButton({
   loading?: boolean;
   disabled?: boolean;
 }) {
+  const { colors, ui } = useTheme();
   return (
     <Pressable
       accessibilityRole="button"
@@ -241,20 +348,35 @@ export function PrimaryButton({
       onPress={onPress}
       style={({ pressed }) => [ui.primary, { opacity: pressed || disabled ? 0.7 : 1 }]}
     >
-      {loading ? <ActivityIndicator color={colors.bgBottom} /> : <Text style={ui.primaryText}>{label}</Text>}
+      {loading ? <ActivityIndicator color={colors.onAccent} /> : <Text style={ui.primaryText}>{label}</Text>}
     </Pressable>
   );
 }
 
-export function SecondaryButton({ label, onPress }: { label: string; onPress: () => void }) {
+export function SecondaryButton({
+  label,
+  onPress,
+  disabled,
+}: {
+  label: string;
+  onPress: () => void;
+  disabled?: boolean;
+}) {
+  const { ui } = useTheme();
   return (
-    <Pressable accessibilityRole="button" onPress={onPress} style={ui.secondary}>
+    <Pressable
+      accessibilityRole="button"
+      disabled={disabled}
+      onPress={onPress}
+      style={[ui.secondary, { opacity: disabled ? 0.7 : 1 }]}
+    >
       <Text style={ui.secondaryText}>{label}</Text>
     </Pressable>
   );
 }
 
 export function Notice({ tone, children }: { tone: 'danger' | 'success'; children: React.ReactNode }) {
+  const { ui } = useTheme();
   if (!children) return null;
   const danger = tone === 'danger';
   return (
@@ -268,7 +390,17 @@ export function ErrorText({ children }: { children: React.ReactNode }) {
   return <Notice tone="danger">{children}</Notice>;
 }
 
+export function showAlert(message: string, title = 'Eksik bilgi'): void {
+  Alert.alert(title, message);
+}
+
+export function flagMissing(setMessage: (message: string | null) => void, message: string): void {
+  setMessage(message);
+  showAlert(message);
+}
+
 export function GoogleMark() {
+  const { ui } = useTheme();
   return (
     <View style={ui.googleMark}>
       <View style={[ui.googleSlice, ui.googleSliceBlue]} />
@@ -291,6 +423,7 @@ export function GoogleButton({
   onPress: () => void;
   disabled?: boolean;
 }) {
+  const { ui } = useTheme();
   return (
     <Pressable
       accessibilityRole="button"
@@ -305,6 +438,7 @@ export function GoogleButton({
 }
 
 export function OrDivider() {
+  const { ui } = useTheme();
   return (
     <View style={ui.divider}>
       <View style={ui.dividerLine} />

@@ -113,7 +113,7 @@ export function Composer({
           type="submit"
           aria-label="Gönder"
           disabled={disabled || !value.trim()}
-          className={cx(iconButton, 'bg-accent-gradient text-text shadow-lg')}
+          className={cx(iconButton, 'bg-accent-gradient text-on-accent shadow-lg')}
         >
           <SendIcon />
         </button>

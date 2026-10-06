@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { config as loadEnv } from 'dotenv';
 
@@ -55,6 +56,18 @@ function placeholderPhoto(name: string, seed: number): Promise<Buffer> {
   return sharp(Buffer.from(svg)).jpeg({ quality: 85 }).toBuffer();
 }
 
+const ANCHOR = { latitude: 41.01, longitude: 28.98 };
+
+function near(latitude: number, longitude: number, index: number): { latitude: number; longitude: number } {
+  const angle = (index * 137.5 * Math.PI) / 180;
+  const km = 1.2 + (index % 8) * 0.7;
+  const latRad = (latitude * Math.PI) / 180;
+  return {
+    latitude: Math.round((latitude + (km / 111.32) * Math.cos(angle)) * 10000) / 10000,
+    longitude: Math.round((longitude + (km / (111.32 * Math.max(Math.cos(latRad), 0.2))) * Math.sin(angle)) * 10000) / 10000,
+  };
+}
+
 function birthDate(age: number, seed: number): Date {
   const now = new Date();
   return new Date(Date.UTC(now.getUTCFullYear() - age - 1, (seed * 5) % 12, 1 + (seed % 27)));
@@ -76,16 +89,34 @@ async function main(): Promise<void> {
   const storage = app.get(StorageService);
   const passwordHash = await app.get(PasswordService).hash(DEMO_PASSWORD);
   const interests = await prisma.interest.findMany({ select: { id: true } });
+  const anchorProfile = await prisma.userProfile.findFirst({
+    where: {
+      latitude: { not: null },
+      longitude: { not: null },
+      user: { deletedAt: null, email: { not: { startsWith: 'demo' } } },
+    },
+    orderBy: { locationUpdatedAt: 'desc' },
+    select: { latitude: true, longitude: true },
+  });
+  const anchor = {
+    latitude: anchorProfile?.latitude ?? ANCHOR.latitude,
+    longitude: anchorProfile?.longitude ?? ANCHOR.longitude,
+  };
 
   let created = 0;
   for (let index = 0; index < DEMO_COUNT; index += 1) {
     const email = `demo${index + 1}@dating.local`;
-    if (await prisma.user.findUnique({ where: { email }, select: { id: true } })) continue;
+    const point = near(anchor.latitude, anchor.longitude, index);
+    const existing = await prisma.user.findUnique({ where: { email }, select: { id: true } });
+    if (existing) {
+      await placeDemo(prisma, existing.id, point, index);
+      continue;
+    }
 
     const gender: Gender = index % 2 === 0 ? 'WOMAN' : 'MAN';
     const names = gender === 'WOMAN' ? WOMEN : MEN;
     const firstName = names[Math.floor(index / 2) % names.length]!;
-    const age = 21 + ((index * 7) % 20);
+    const age = 23 + (index % 8);
     const interestIds = interests
       .filter((_, interestIndex) => (interestIndex + index) % 6 === 0)
       .slice(0, 6)
@@ -108,8 +139,8 @@ async function main(): Promise<void> {
             occupation: ['Tasarımcı', 'Mühendis', 'Öğretmen', 'Doktor', 'Avukat'][index % 5]!,
             languages: index % 3 === 0 ? ['tr', 'en'] : ['tr'],
             relationshipIntention: (['LONG_TERM', 'SHORT_TERM_OPEN_TO_LONG', 'NOT_SURE'] as const)[index % 3]!,
-            latitude: Math.round((41.0 + ((index * 13) % 20) / 100) * 100) / 100,
-            longitude: Math.round((28.85 + ((index * 17) % 30) / 100) * 100) / 100,
+            latitude: point.latitude,
+            longitude: point.longitude,
             locationUpdatedAt: new Date(),
             onboardingCompletedAt: new Date(),
             lastActiveAt: new Date(Date.now() - (index % 10) * 12 * 60 * 60 * 1000),
@@ -117,9 +148,9 @@ async function main(): Promise<void> {
         },
         preferences: {
           create: {
-            interestedIn: index % 5 === 0 ? ['WOMAN', 'MAN'] : [gender === 'WOMAN' ? 'MAN' : 'WOMAN'],
+            interestedIn: ['WOMAN', 'MAN', 'NON_BINARY'],
             ageMin: 18,
-            ageMax: 50,
+            ageMax: 80,
             maxDistanceKm: 100,
           },
         },
@@ -159,8 +190,104 @@ async function main(): Promise<void> {
     created += 1;
   }
 
-  logger.log(`${created} demo kullanıcı oluşturuldu (toplam ${DEMO_COUNT}). Şifre: ${DEMO_PASSWORD}`);
+  const linked = await linkDemoToRealUsers(prisma);
+  logger.log(`${created} yeni demo profil. Yakındaki hesaplara ${linked} beğeni ve eşleşme bağlandı.`);
   await app.close();
+}
+
+async function placeDemo(
+  prisma: PrismaService,
+  userId: string,
+  point: { latitude: number; longitude: number },
+  index: number,
+): Promise<void> {
+  await prisma.user.update({
+    where: { id: userId },
+    data: { birthDate: birthDate(23 + (index % 8), index), emailVerifiedAt: new Date() },
+  });
+  await prisma.userProfile.update({
+    where: { userId },
+    data: {
+      latitude: point.latitude,
+      longitude: point.longitude,
+      locationUpdatedAt: new Date(),
+      onboardingCompletedAt: new Date(),
+      lastActiveAt: new Date(),
+    },
+  });
+  await prisma.userPreferences.update({
+    where: { userId },
+    data: { interestedIn: ['WOMAN', 'MAN', 'NON_BINARY'], ageMin: 18, ageMax: 80, maxDistanceKm: 100 },
+  });
+}
+
+async function linkDemoToRealUsers(prisma: PrismaService): Promise<number> {
+  const demos = await prisma.user.findMany({
+    where: { email: { startsWith: 'demo' }, deletedAt: null },
+    orderBy: { email: 'asc' },
+    select: { id: true },
+  });
+  const viewers = await prisma.user.findMany({
+    where: {
+      deletedAt: null,
+      email: { not: { startsWith: 'demo' } },
+      profile: { latitude: { not: null }, onboardingCompletedAt: { not: null } },
+    },
+    select: { id: true },
+  });
+  let linked = 0;
+  for (const viewer of viewers) {
+    const [partner, superFan, ...fans] = demos;
+    if (!partner || !superFan) continue;
+    linked += await ensureSwipe(prisma, partner.id, viewer.id, 'LIKE');
+    linked += await ensureSwipe(prisma, viewer.id, partner.id, 'LIKE');
+    await ensureMatch(prisma, partner.id, viewer.id);
+    linked += await ensureSwipe(prisma, superFan.id, viewer.id, 'SUPER_LIKE');
+    for (const fan of fans.slice(0, 3)) {
+      linked += await ensureSwipe(prisma, fan.id, viewer.id, 'LIKE');
+    }
+  }
+  return linked;
+}
+
+async function ensureSwipe(
+  prisma: PrismaService,
+  actorUserId: string,
+  targetUserId: string,
+  action: 'LIKE' | 'SUPER_LIKE',
+): Promise<number> {
+  const existing = await prisma.swipe.findUnique({
+    where: { actorUserId_targetUserId: { actorUserId, targetUserId } },
+    select: { id: true },
+  });
+  if (existing) return 0;
+  await prisma.swipe.create({ data: { actorUserId, targetUserId, action } });
+  return 1;
+}
+
+async function ensureMatch(prisma: PrismaService, first: string, second: string): Promise<void> {
+  const pair = first < second ? { userAId: first, userBId: second } : { userAId: second, userBId: first };
+  const match = await prisma.match.upsert({
+    where: { userAId_userBId: pair },
+    create: { ...pair, lastMessageAt: new Date() },
+    update: { status: 'ACTIVE' },
+  });
+  const conversation = await prisma.conversation.upsert({
+    where: { matchId: match.id },
+    create: { matchId: match.id, lastMessageAt: new Date() },
+    update: {},
+  });
+  const messages = await prisma.message.count({ where: { conversationId: conversation.id } });
+  if (messages > 0) return;
+  await prisma.message.create({
+    data: {
+      conversationId: conversation.id,
+      senderId: first,
+      clientMessageId: randomUUID(),
+      type: 'TEXT',
+      body: 'Merhaba, eşleştiğimize sevindim.',
+    },
+  });
 }
 
 main().catch((error: unknown) => {
