@@ -1,6 +1,6 @@
 import { verifyEmailSchema } from '@dating/validation';
 import { api, errorMessage } from '@/api';
-import { ErrorText, PrimaryButton, Screen, Subtitle, Title } from '@/ui';
+import { PrimaryButton, Screen, Subtitle, Title, showAlert } from '@/ui';
 import { useTheme } from '@/theme';
 import { Link, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
@@ -9,14 +9,17 @@ export default function VerifyEmailScreen() {
   const { colors } = useTheme();
   const params = useLocalSearchParams<{ token?: string }>();
   const token = typeof params.token === 'string' ? params.token : '';
-  const [error, setError] = useState<string | null>(token ? null : 'Bağlantı geçersiz.');
   const [done, setDone] = useState(false);
   const [busy, setBusy] = useState(false);
   const router = useRouter();
   const started = useRef(false);
 
   useEffect(() => {
-    if (!token || started.current) return;
+    if (!token) {
+      showAlert('Bağlantı geçersiz.');
+      return;
+    }
+    if (started.current) return;
     started.current = true;
     void onSubmit();
   }, [token]);
@@ -24,17 +27,16 @@ export default function VerifyEmailScreen() {
   async function onSubmit() {
     const parsed = verifyEmailSchema.safeParse({ token });
     if (!parsed.success) {
-      setError('Bağlantı geçersiz.');
+      showAlert('Bağlantı geçersiz.');
       return;
     }
     setBusy(true);
-    setError(null);
     try {
       await api('/auth/verify-email', { method: 'POST', auth: false, body: parsed.data });
       setDone(true);
       router.replace({ pathname: '/login', params: { verified: '1' } });
     } catch (caught) {
-      setError(errorMessage(caught));
+      showAlert(errorMessage(caught), 'Doğrulanamadı');
     } finally {
       setBusy(false);
     }
@@ -48,7 +50,6 @@ export default function VerifyEmailScreen() {
           ? 'E-postan doğrulandı. Giriş ekranına geç. Şifreni orada yazman gerekir; maildeki düğme seni içeri almaz.'
           : 'Bu adım yalnız e-postanın sana ait olduğunu onaylar. Ardından şifrenle giriş yaparsın.'}
       </Subtitle>
-      <ErrorText>{error}</ErrorText>
       {done ? null : <PrimaryButton label="Doğrula" onPress={() => void onSubmit()} loading={busy} />}
       <Link href="/login" style={{ color: colors.primarySoft }}>
         Girişe dön

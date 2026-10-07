@@ -1,3 +1,4 @@
+import { AppAlertHost } from '@/app-alert';
 import { ThemeProvider, useTheme } from '@/theme';
 import { useSession } from '@/session';
 import { refreshStoredLocation } from '@/place';
@@ -70,6 +71,7 @@ export default function RootLayout() {
             <AuthGate>
               <ThemedNavigation />
             </AuthGate>
+            <AppAlertHost />
           </SessionProvider>
         </QueryClientProvider>
       </ThemeProvider>

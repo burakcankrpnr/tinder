@@ -21,7 +21,7 @@ const SUGGESTION_LABELS: Record<DiscoveryFeedDto['suggestions'][number], string>
 
 function DeckSkeleton() {
   return (
-    <div aria-busy="true" aria-label="Profiller yükleniyor" className="bg-surface-2/70 absolute inset-0 animate-pulse rounded-card">
+    <div aria-busy="true" aria-label="Sana uygun kişileri seçiyoruz" className="bg-surface-2/70 absolute inset-0 animate-pulse rounded-card">
       <div className="absolute inset-x-5 bottom-6 space-y-3">
         <div className="bg-text/10 h-7 w-1/2 rounded-full" />
         <div className="bg-text/10 h-4 w-1/3 rounded-full" />
@@ -171,8 +171,8 @@ export function DiscoverDeck() {
         <Card className="space-y-5 py-10 text-center">
           <div aria-hidden className="bg-accent-gradient mx-auto size-16 rounded-3xl opacity-80" />
           <div className="space-y-1">
-            <h2 className="text-xl font-semibold">Şu an yakınında yeni profil bulunamadı.</h2>
-            <p className="text-text-muted text-sm">Tercihlerini biraz esnetirsen daha çok kişi görebilirsin.</p>
+            <h2 className="text-xl font-semibold">Yakınında yeni kişi kalmadı.</h2>
+            <p className="text-text-muted text-sm">Tercihlerini esnet, daha çok kişi gelsin.</p>
           </div>
           <div className="flex flex-col gap-2">
             {deck.suggestions

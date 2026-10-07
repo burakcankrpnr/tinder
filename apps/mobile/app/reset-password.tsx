@@ -1,6 +1,6 @@
 import { resetPasswordSchema } from '@dating/validation';
 import { api, errorMessage } from '@/api';
-import { ErrorText, Field, PrimaryButton, Screen, Subtitle, Title, flagMissing } from '@/ui';
+import { Field, PrimaryButton, Screen, Subtitle, Title, flagMissing, showAlert } from '@/ui';
 import { useTheme } from '@/theme';
 import { Link, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
@@ -10,7 +10,6 @@ export default function ResetPasswordScreen() {
   const params = useLocalSearchParams<{ token?: string }>();
   const token = typeof params.token === 'string' ? params.token : '';
   const [password, setPassword] = useState('');
-  const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -18,18 +17,16 @@ export default function ResetPasswordScreen() {
     const parsed = resetPasswordSchema.safeParse({ token, password });
     if (!parsed.success) {
       flagMissing(
-        setError,
         !token ? 'Bağlantı geçersiz.' : !password ? 'Şifre boş bırakılamaz.' : (parsed.error.issues[0]?.message ?? 'Şifreyi kontrol et.'),
       );
       return;
     }
     setBusy(true);
-    setError(null);
     try {
       await api('/auth/reset-password', { method: 'POST', auth: false, body: { token, password } });
       setDone(true);
     } catch (caught) {
-      setError(errorMessage(caught));
+      showAlert(errorMessage(caught), 'Şifre güncellenemedi');
     } finally {
       setBusy(false);
     }
@@ -39,10 +36,16 @@ export default function ResetPasswordScreen() {
     <Screen>
       <Title>Yeni şifre</Title>
       <Subtitle>{done ? 'Şifren güncellendi.' : 'En az 10 karakter, bir harf ve bir rakam.'}</Subtitle>
-      <ErrorText>{error}</ErrorText>
       {done ? null : (
         <>
-          <Field label="Yeni şifre" secureTextEntry value={password} onChangeText={setPassword} />
+          <Field
+            label="Yeni şifre"
+            secureTextEntry
+            autoComplete="new-password"
+            textContentType="newPassword"
+            value={password}
+            onChangeText={setPassword}
+          />
           <PrimaryButton label="Kaydet" onPress={() => void onSubmit()} loading={busy} />
         </>
       )}

@@ -7,4 +7,5 @@ export * from './communication';
 export * from './discovery';
 export * from './photos';
 export * from './profile';
+export * from './profile-prompts';
 export * from './media';

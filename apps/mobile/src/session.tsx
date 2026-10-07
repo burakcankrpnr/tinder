@@ -23,10 +23,15 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       setUser(result?.user ?? null);
       setStatus(result ? 'authenticated' : 'anonymous');
     });
-    void loadSession().then((result) => {
-      setUser(result?.user ?? null);
-      setStatus(result ? 'authenticated' : 'anonymous');
-    });
+    void loadSession()
+      .then((result) => {
+        setUser(result?.user ?? null);
+        setStatus(result ? 'authenticated' : 'anonymous');
+      })
+      .catch(() => {
+        setUser(null);
+        setStatus('anonymous');
+      });
     return unsubscribe;
   }, []);
 

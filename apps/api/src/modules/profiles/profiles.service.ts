@@ -10,6 +10,7 @@ import {
   type ProfileControlsInput,
   type ProfileShowcaseInput,
   calculateAge,
+  zodiacFromDate,
 } from '@dating/validation';
 import { canAuthenticate } from '../../common/auth/user-status';
 import { DomainEvent, type ProfileCompletedEvent } from '../../common/events/domain-events';
@@ -80,6 +81,13 @@ function toBasicsDto(profile: UserProfile): ProfileBasicsDto {
     country: profile.country,
     occupation: profile.occupation,
     education: profile.education,
+    educationLevel: profile.educationLevel,
+    sexualOrientation: profile.sexualOrientation,
+    kids: profile.kids,
+    communicationStyle: profile.communicationStyle,
+    loveStyle: profile.loveStyle,
+    pets: profile.pets,
+    socialMedia: profile.socialMedia,
     heightCm: profile.heightCm,
     languages: profile.languages,
     relationshipIntention: profile.relationshipIntention,
@@ -137,6 +145,7 @@ export class ProfilesService {
 
     return {
       age: calculateAge(user.birthDate),
+      zodiac: zodiacFromDate(user.birthDate),
       controls: toControls(profile),
       showcase: toShowcase(profile),
       profile: profile

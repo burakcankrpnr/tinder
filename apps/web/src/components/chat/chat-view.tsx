@@ -168,7 +168,7 @@ export function ChatView({ match, myUserId }: { match: MatchDetailDto; myUserId:
         <div ref={topSentinel} />
         {messagesQuery.isPending ? (
           <div className="text-primary flex justify-center py-10">
-            <Spinner className="size-6" label="Mesajlar yükleniyor" />
+            <Spinner className="size-6" label="Mesajların geliyor" />
           </div>
         ) : messagesQuery.isError ? (
           <div className="space-y-3 text-center">

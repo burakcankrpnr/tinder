@@ -1,6 +1,6 @@
 import type { Prisma } from '@dating/database';
 import type { PublicProfileDto } from '@dating/types';
-import { calculateAge } from '@dating/validation';
+import { calculateAge, zodiacFromDate } from '@dating/validation';
 import { variantUrls } from '../photos/photo.mapper';
 
 /** Public profil için gereken ilişkiler; e-posta, doğum tarihi, koordinat gibi alanlar DTO'ya taşınmaz. */
@@ -55,6 +55,12 @@ export function toPublicProfileDto(
     country: profile.country,
     occupation: profile.occupation,
     education: profile.education,
+    educationLevel: profile.educationLevel,
+    sexualOrientation: profile.sexualOrientation,
+    zodiac: zodiacFromDate(profile.user.birthDate),
+    kids: profile.kids,
+    communicationStyle: profile.communicationStyle,
+    loveStyle: profile.loveStyle,
     heightCm: profile.heightCm,
     languages: profile.languages,
     relationshipIntention: profile.relationshipIntention,
@@ -62,6 +68,8 @@ export function toPublicProfileDto(
       drinking: profile.drinking,
       smoking: profile.smoking,
       exercise: profile.exercise,
+      pets: profile.pets,
+      socialMedia: profile.socialMedia,
     },
     interests: profile.user.interests.map(({ interest }) => ({
       slug: interest.slug,

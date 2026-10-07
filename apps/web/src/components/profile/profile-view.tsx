@@ -4,7 +4,21 @@ import type { MyProfileDto, PublicProfileDto } from '@dating/types';
 import { Card, Tag, cx } from '@dating/ui';
 import Image from 'next/image';
 import { useState } from 'react';
-import { FREQUENCY_LABELS, GENDER_LABELS, INTENTION_LABELS, languageLabel } from '@/lib/labels';
+import {
+  COMMUNICATION_LABELS,
+  EDUCATION_LEVEL_LABELS,
+  EXERCISE_LABELS,
+  FREQUENCY_LABELS,
+  GENDER_LABELS,
+  INTENTION_LABELS,
+  KIDS_LABELS,
+  LOVE_LABELS,
+  PET_LABELS,
+  SEXUAL_ORIENTATION_LABELS,
+  SOCIAL_LABELS,
+  ZODIAC_LABELS,
+  languageLabel,
+} from '@/lib/labels';
 
 /** Kendi profilini, başkalarının göreceği public görünümle önizlemek için. */
 export function toPublicView(me: MyProfileDto, id: string): PublicProfileDto | null {
@@ -21,10 +35,22 @@ export function toPublicView(me: MyProfileDto, id: string): PublicProfileDto | n
     country: profile.country,
     occupation: profile.occupation,
     education: profile.education,
+    educationLevel: profile.educationLevel,
+    sexualOrientation: profile.sexualOrientation,
+    zodiac: me.zodiac,
+    kids: profile.kids,
+    communicationStyle: profile.communicationStyle,
+    loveStyle: profile.loveStyle,
     heightCm: profile.heightCm,
     languages: profile.languages,
     relationshipIntention: profile.relationshipIntention,
-    lifestyle: { drinking: profile.drinking, smoking: profile.smoking, exercise: profile.exercise },
+    lifestyle: {
+      drinking: profile.drinking,
+      smoking: profile.smoking,
+      exercise: profile.exercise,
+      pets: profile.pets,
+      socialMedia: profile.socialMedia,
+    },
     interests: me.interests.map(({ slug, name }) => ({ slug, name })),
     photos: me.photos.flatMap((photo) =>
       photo.status === 'APPROVED' && photo.urls
@@ -131,12 +157,20 @@ export function ProfileView({ profile }: { profile: PublicProfileDto }) {
               value={profile.relationshipIntention ? INTENTION_LABELS[profile.relationshipIntention] : null}
             />
             <Detail label="Meslek" value={profile.occupation} />
-            <Detail label="Eğitim" value={profile.education} />
+            <Detail label="Eğitim seviyesi" value={profile.educationLevel ? EDUCATION_LEVEL_LABELS[profile.educationLevel] : null} />
+            <Detail label="Üniversite" value={profile.education} />
+            <Detail label="Yönelim" value={profile.sexualOrientation ? SEXUAL_ORIENTATION_LABELS[profile.sexualOrientation] : null} />
+            <Detail label="Burç" value={ZODIAC_LABELS[profile.zodiac]} />
+            <Detail label="Çocuk" value={profile.kids ? KIDS_LABELS[profile.kids] : null} />
+            <Detail label="İletişim" value={profile.communicationStyle ? COMMUNICATION_LABELS[profile.communicationStyle] : null} />
+            <Detail label="Aşk dili" value={profile.loveStyle ? LOVE_LABELS[profile.loveStyle] : null} />
             <Detail label="Boy" value={profile.heightCm ? `${profile.heightCm} cm` : null} />
             <Detail label="Diller" value={profile.languages.map(languageLabel).join(', ')} />
             <Detail label="Alkol" value={lifestyle.drinking ? FREQUENCY_LABELS[lifestyle.drinking] : null} />
             <Detail label="Sigara" value={lifestyle.smoking ? FREQUENCY_LABELS[lifestyle.smoking] : null} />
-            <Detail label="Spor" value={lifestyle.exercise ? FREQUENCY_LABELS[lifestyle.exercise] : null} />
+            <Detail label="Spor" value={lifestyle.exercise ? EXERCISE_LABELS[lifestyle.exercise] : null} />
+            <Detail label="Evcil hayvan" value={lifestyle.pets ? PET_LABELS[lifestyle.pets] : null} />
+            <Detail label="Sosyal medya" value={lifestyle.socialMedia ? SOCIAL_LABELS[lifestyle.socialMedia] : null} />
           </dl>
         </Card>
 

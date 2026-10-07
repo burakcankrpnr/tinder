@@ -83,6 +83,13 @@ export function AuthModals() {
 function SignupForm({ titleId }: { titleId: string }) {
   const [error, setError] = useState('');
   const [done, setDone] = useState<string | null>(null);
+  const [account, setAccount] = useState<PreviewAccount | null>(null);
+  const [hydrated, setHydrated] = useState(false);
+
+  useEffect(() => {
+    setAccount(readAccount());
+    setHydrated(true);
+  }, []);
 
   const onSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -98,8 +105,8 @@ function SignupForm({ titleId }: { titleId: string }) {
       setError('Devam etmek için 18 yaşından büyük olmalısın.');
       return;
     }
-    const account: PreviewAccount = { name, email, birthday };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(account));
+    const created: PreviewAccount = { name, email, birthday };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(created));
     setError('');
     setDone(name);
   };
@@ -111,18 +118,18 @@ function SignupForm({ titleId }: { titleId: string }) {
       {done ? (
         <SuccessBox title={`Hoş geldin, ${done}.`} text="Hesabın bu tarayıcıda hazır. Kaydırmaya buradan devam edebilirsin." />
       ) : (
-        <form onSubmit={onSubmit}>
+        <form onSubmit={onSubmit} autoComplete="on" key={hydrated ? (account?.email ?? 'new') : 'pending'}>
           <label>
             Ad
-            <input name="name" required maxLength={40} autoComplete="name" />
+            <input name="name" required maxLength={40} autoComplete="name" defaultValue={account?.name ?? ''} />
           </label>
           <label>
             E-posta
-            <input name="email" type="email" required autoComplete="email" />
+            <input name="email" type="email" required autoComplete="email" inputMode="email" defaultValue={account?.email ?? ''} />
           </label>
           <label>
             Doğum tarihi
-            <input name="birthday" type="date" required />
+            <input name="birthday" type="date" required autoComplete="bday" defaultValue={account?.birthday ?? ''} />
           </label>
           <p className="form-error" role="alert">
             {error}
@@ -139,6 +146,13 @@ function SignupForm({ titleId }: { titleId: string }) {
 function LoginForm({ titleId, onSwitch }: { titleId: string; onSwitch: () => void }) {
   const [error, setError] = useState('');
   const [done, setDone] = useState<string | null>(null);
+  const [account, setAccount] = useState<PreviewAccount | null>(null);
+  const [hydrated, setHydrated] = useState(false);
+
+  useEffect(() => {
+    setAccount(readAccount());
+    setHydrated(true);
+  }, []);
 
   const onSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -162,10 +176,10 @@ function LoginForm({ titleId, onSwitch }: { titleId: string; onSwitch: () => voi
       {done ? (
         <SuccessBox title={`Tekrar merhaba, ${done}.`} text="Oturumun bu tarayıcıda açıldı." />
       ) : (
-        <form onSubmit={onSubmit}>
+        <form onSubmit={onSubmit} autoComplete="on" key={hydrated ? (account?.email ?? 'new') : 'pending'}>
           <label>
             E-posta
-            <input name="email" type="email" required autoComplete="email" />
+            <input name="email" type="email" required autoComplete="username" inputMode="email" defaultValue={account?.email ?? ''} />
           </label>
           <p className="form-error" role="alert">
             {error}

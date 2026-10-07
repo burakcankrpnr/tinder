@@ -1,5 +1,6 @@
 import type { ChatMessageDto, MessagePageDto } from '@dating/types';
 import { api, errorMessage } from '@/api';
+import { showAlert } from '@/ui';
 import { useTheme } from '@/theme';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import * as Crypto from 'expo-crypto';
@@ -15,7 +16,6 @@ export default function ChatScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [body, setBody] = useState('');
-  const [error, setError] = useState<string | null>(null);
   const messages = useQuery({
     queryKey: ['messages', id],
     queryFn: () => api<MessagePageDto>(`/matches/${id}/messages`),
@@ -25,7 +25,6 @@ export default function ChatScreen() {
   async function send() {
     const text = body.trim();
     if (!text) return;
-    setError(null);
     setBody('');
     try {
       await api<ChatMessageDto>(`/matches/${id}/messages`, {
@@ -36,7 +35,7 @@ export default function ChatScreen() {
       await queryClient.invalidateQueries({ queryKey: ['messages', id] });
       await queryClient.invalidateQueries({ queryKey: ['matches'] });
     } catch (caught) {
-      setError(errorMessage(caught));
+      showAlert(errorMessage(caught), 'Gönderilemedi');
     }
   }
 
@@ -48,7 +47,6 @@ export default function ChatScreen() {
         </Pressable>
         <Text style={{ color: colors.text, fontSize: 18, fontWeight: '700' }}>Sohbet</Text>
       </View>
-      {error ? <Text style={ui.error}>{error}</Text> : null}
       <FlatList
         data={[...(messages.data?.messages ?? [])].reverse()}
         keyExtractor={(item) => item.id}
@@ -58,7 +56,7 @@ export default function ChatScreen() {
             <Text style={{ color: colors.text }}>{item.deleted ? 'Mesaj silindi' : item.body}</Text>
           </View>
         )}
-        ListEmptyComponent={<Text style={[ui.subtitle, { padding: 16 }]}>Henüz mesaj yok.</Text>}
+        ListEmptyComponent={<Text style={[ui.subtitle, { padding: 16 }]}>İlk mesajı sen at.</Text>}
       />
       <View style={{ flexDirection: 'row', gap: 8, padding: 12 }}>
         <TextInput

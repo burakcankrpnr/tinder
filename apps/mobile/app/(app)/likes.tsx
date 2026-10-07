@@ -1,11 +1,11 @@
 import type { LikesReceivedDto } from '@dating/types';
 import { Ionicons } from '@expo/vector-icons';
 import { api, deviceUrl, errorMessage } from '@/api';
-import { ErrorText } from '@/ui';
+import { showAlert } from '@/ui';
 import { useTheme } from '@/theme';
 import { useQuery } from '@tanstack/react-query';
 import { Link, useFocusEffect } from 'expo-router';
-import { useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
 import { Image, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -15,18 +15,23 @@ export default function LikesScreen() {
   const { refetch } = likes;
   const data = likes.data;
 
+  const loadError = likes.isError ? errorMessage(likes.error) : null;
+
   useFocusEffect(
     useCallback(() => {
       void refetch();
     }, [refetch]),
   );
 
+  useEffect(() => {
+    if (loadError) showAlert(loadError, 'Yüklenemedi');
+  }, [loadError]);
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bgBottom }} edges={['top']}>
       <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 8, paddingBottom: 24, gap: 16 }}>
         <Text style={ui.title}>Beğeniler</Text>
-        <ErrorText>{likes.error ? errorMessage(likes.error) : null}</ErrorText>
-        {likes.isLoading ? <Text style={ui.subtitle}>Yükleniyor.</Text> : null}
+        {likes.isLoading ? <Text style={ui.subtitle}>Beğenilerin geliyor.</Text> : null}
         {data?.locked ? (
           <View style={[ui.card, { padding: 24, alignItems: 'center', gap: 12 }]}>
             <View style={ui.pageIcon}>
@@ -35,8 +40,8 @@ export default function LikesScreen() {
             <Text style={[ui.title, { fontSize: 40 }]}>{data.total}</Text>
             <Text style={[ui.subtitle, ui.centered]}>
               {data.total === 0
-                ? 'Henüz sizi beğenen kimse yok.'
-                : 'kişi sizi beğendi. Kim olduklarını görmek için Plus veya Premium gerekir.'}
+                ? 'Henüz beğeni yok. Keşfette kaydırmaya devam et.'
+                : 'kişi seni beğendi. Kim olduklarını Plus ile gör.'}
             </Text>
             <Link href="/subscription" asChild>
               <Pressable accessibilityRole="button" style={ui.primary}>
@@ -50,7 +55,7 @@ export default function LikesScreen() {
             <View style={ui.pageIcon}>
               <Ionicons name="heart-outline" size={26} color={colors.onAccent} />
             </View>
-            <Text style={[ui.subtitle, ui.centered]}>Henüz beğeni yok.</Text>
+            <Text style={[ui.subtitle, ui.centered]}>İlk beğeni yolda. Kaydırmaya devam et.</Text>
           </View>
         ) : null}
         {data && !data.locked && data.items.length > 0 ? (

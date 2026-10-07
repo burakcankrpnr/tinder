@@ -18,7 +18,7 @@ export function AdminGuard({ children }: { children: ReactNode }) {
     if (state.status === 'anonymous') router.replace(`/admin/login?next=${encodeURIComponent(pathname)}`);
   }, [state.status, pathname, router]);
 
-  if (state.status === 'loading' || state.status === 'anonymous') return <FullPageSpinner />;
+  if (state.status === 'loading' || state.status === 'anonymous') return <FullPageSpinner label="Yükleniyor" />;
   if (!staff) {
     return (
       <div className="mx-auto flex min-h-dvh max-w-md flex-col justify-center gap-4 px-6">

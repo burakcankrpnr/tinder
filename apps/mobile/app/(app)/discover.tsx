@@ -1,7 +1,7 @@
 import type { DiscoveryCardDto, DiscoveryFeedDto, SwipeResultDto } from '@dating/types';
 import { Ionicons } from '@expo/vector-icons';
 import { api, deviceUrl, errorMessage } from '@/api';
-import { ErrorText, showAlert } from '@/ui';
+import { showAlert } from '@/ui';
 import { useTheme } from '@/theme';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useFocusEffect } from 'expo-router';
@@ -74,7 +74,6 @@ export default function DiscoverScreen() {
   const feed = useQuery({ queryKey: ['discovery'], queryFn: () => api<DiscoveryFeedDto>('/discovery?limit=10') });
   const { refetch } = feed;
   const [skipped, setSkipped] = useState<string[]>([]);
-  const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const cards = (feed.data?.cards ?? []).filter((card) => !skipped.includes(card.id));
@@ -143,7 +142,6 @@ export default function DiscoverScreen() {
 
   async function swipe(action: 'LIKE' | 'PASS' | 'SUPER_LIKE', target: DiscoveryCardDto) {
     setBusy(true);
-    setError(null);
     try {
       const result = await api<SwipeResultDto>('/swipes', {
         method: 'POST',
@@ -151,14 +149,12 @@ export default function DiscoverScreen() {
       });
       setSkipped((current) => [...current, target.id]);
       if (result.match) {
-        showAlert(`${result.match.user.firstName} ile eşleştiniz. Eşleşmeler sekmesinden yazabilirsiniz.`, 'Eşleşme');
+        showAlert(`${result.match.user.firstName} ile eşleştin. İlk mesajı sen at.`, 'Eşleşme', 'success');
         void queryClient.invalidateQueries({ queryKey: ['matches'] });
       }
       if (cards.length < 3) void queryClient.invalidateQueries({ queryKey: ['discovery'] });
     } catch (caught) {
-      const message = errorMessage(caught);
-      setError(message);
-      showAlert(message, 'İşlem olmadı');
+      showAlert(errorMessage(caught), 'İşlem olmadı');
     } finally {
       setBusy(false);
     }
@@ -183,14 +179,13 @@ export default function DiscoverScreen() {
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bgBottom }} edges={['top']}>
       <View style={{ flex: 1, paddingHorizontal: 16, paddingBottom: 12, gap: 12 }}>
         <Text style={ui.title}>Keşfet</Text>
-        <ErrorText>{error}</ErrorText>
         {!card ? (
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 }}>
             <View style={ui.pageIcon}>
               <Ionicons name="compass" size={26} color={colors.onAccent} />
             </View>
             <Text style={[ui.subtitle, ui.centered]}>
-              {feed.isLoading ? 'Yükleniyor.' : 'Şu an gösterilecek kimse yok. Tercihlerinizi genişletebilirsiniz.'}
+              {feed.isLoading ? 'Sana uygun kişileri seçiyoruz.' : 'Yakınında yeni kişi yok. Tercihlerini genişlet.'}
             </Text>
           </View>
         ) : (

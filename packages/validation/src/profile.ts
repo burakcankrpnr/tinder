@@ -1,4 +1,12 @@
 import { z } from 'zod';
+import {
+  COMMUNICATION_STYLES,
+  EDUCATION_LEVELS,
+  KIDS_PREFERENCES,
+  LOVE_STYLES,
+  PET_STATUSES,
+  SEXUAL_ORIENTATIONS,
+} from './profile-prompts';
 
 export const GENDERS = ['WOMAN', 'MAN', 'NON_BINARY'] as const;
 export const RELATIONSHIP_INTENTIONS = [
@@ -98,6 +106,13 @@ export const profileBasicsSchema = z.object({
   country: countryCodeSchema,
   occupation: optionalText(80),
   education: optionalText(80),
+  educationLevel: optionalEnum(EDUCATION_LEVELS),
+  sexualOrientation: optionalEnum(SEXUAL_ORIENTATIONS),
+  kids: optionalEnum(KIDS_PREFERENCES),
+  communicationStyle: optionalEnum(COMMUNICATION_STYLES),
+  loveStyle: optionalEnum(LOVE_STYLES),
+  pets: optionalEnum(PET_STATUSES),
+  socialMedia: optionalEnum(LIFESTYLE_FREQUENCIES),
   heightCm: z
     .union([z.coerce.number().int().min(120).max(230), z.literal(''), z.null()])
     .optional()

@@ -148,7 +148,7 @@ export function SelectField({
           style={[ui.select, { opacity: disabled ? 0.5 : 1 }]}
         >
           <Text style={summary ? ui.selectText : ui.selectPlaceholder} numberOfLines={1}>
-            {loading ? 'Yükleniyor…' : summary || placeholder}
+            {loading ? 'Seçenekler geliyor.' : summary || placeholder}
           </Text>
           <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={18} color={colors.textMuted} />
         </Pressable>

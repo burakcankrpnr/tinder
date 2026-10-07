@@ -616,6 +616,58 @@ enum LifestyleFrequency {
   OFTEN
 }
 
+enum SexualOrientation {
+  STRAIGHT
+  GAY
+  LESBIAN
+  BISEXUAL
+  PANSEXUAL
+  ASEXUAL
+  QUEER
+  UNSURE
+}
+
+enum EducationLevel {
+  HIGH_SCHOOL
+  ASSOCIATE
+  BACHELOR
+  MASTER
+  DOCTORATE
+  OTHER
+}
+
+enum KidsPreference {
+  WANT
+  DONT_WANT
+  HAVE_AND_WANT
+  HAVE_AND_DONT
+  NOT_SURE
+}
+
+enum CommunicationStyle {
+  TEXTER
+  CALLER
+  VIDEO
+  BAD_TEXTER
+  IN_PERSON
+}
+
+enum LoveStyle {
+  GESTURES
+  GIFTS
+  TOUCH
+  COMPLIMENTS
+  TIME
+}
+
+enum PetStatus {
+  DOG
+  CAT
+  OTHER
+  NONE
+  WANT_ONE
+}
+
 enum VerificationStatus {
   UNVERIFIED
   PENDING
@@ -640,6 +692,13 @@ model UserProfile {
   country               String?                @db.Char(2)
   occupation            String?
   education             String?
+  educationLevel        EducationLevel?
+  sexualOrientation     SexualOrientation?
+  kids                  KidsPreference?
+  communicationStyle    CommunicationStyle?
+  loveStyle             LoveStyle?
+  pets                  PetStatus?
+  socialMedia           LifestyleFrequency?
   heightCm              Int?                   @db.SmallInt
   languages             String[]
   relationshipIntention RelationshipIntention?

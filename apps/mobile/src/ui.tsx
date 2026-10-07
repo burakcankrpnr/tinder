@@ -1,7 +1,6 @@
 import { useContext, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Dimensions,
   Keyboard,
   Platform,
@@ -280,18 +279,87 @@ export function ProfileMeter({ percent, centered = false }: { percent: number; c
   );
 }
 
-export function BrandSplash({ message = 'Hesabın hazırlanıyor' }: { message?: string }) {
+const SPLASH_LINES = [
+  'Sana en uygun kişiyi arıyoruz.',
+  'Son hazırlıklar bitiyor.',
+  'Eşleşmen birazdan hazır.',
+  'Yakınındaki profiller sıralanıyor.',
+  'İlk kaydırma birazdan sende.',
+  'Beğeniler kontrol ediliyor.',
+  'Sohbetin açılmak üzere.',
+  'Bugün kiminle eşleşeceğini seçiyoruz.',
+  'Fotoğraflar yerine oturuyor.',
+  'Mesafe ve yaş tercihin uygulanıyor.',
+  'Keşfet sırası hazırlanıyor.',
+  'Sana benzeyen kişiler öne alınıyor.',
+  'Yeni eşleşmeler taranıyor.',
+  'Birazdan kaydırmaya başlıyorsun.',
+  'En iyi adaylar seçiliyor.',
+  'Profilin eşleşmeye hazırlanıyor.',
+  'Yakınında kim var, bakıyoruz.',
+  'İlk beğeni için zemin hazır.',
+] as const;
+
+export function BrandSplash() {
   const { colors, ui } = useTheme();
+  const [line, setLine] = useState(0);
+
+  useEffect(() => {
+    const timer = setInterval(() => setLine((current) => (current + 1) % SPLASH_LINES.length), 1800);
+    return () => clearInterval(timer);
+  }, []);
+
   return (
     <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16, backgroundColor: colors.bgBottom, paddingHorizontal: 32 }}>
       <View style={ui.brandMark}>
         <Ionicons name="flame" size={44} color={colors.onAccent} />
       </View>
       <Text style={[ui.title, ui.centered]}>Dating</Text>
-      <Text style={[ui.subtitle, ui.centered]}>{message}</Text>
+      <Text style={[ui.subtitle, ui.centered]}>{SPLASH_LINES[line]}</Text>
       <ActivityIndicator color={colors.primary} />
     </View>
   );
+}
+
+function credentialAutofill(
+  autoComplete: TextInputProps['autoComplete'],
+  textContentType: TextInputProps['textContentType'],
+  importantForAutofill: TextInputProps['importantForAutofill'],
+): Partial<TextInputProps> {
+  const kind =
+    autoComplete === 'email' || autoComplete === 'username'
+      ? 'login-id'
+      : autoComplete === 'password' || autoComplete === 'current-password'
+        ? 'current-password'
+        : autoComplete === 'new-password' || autoComplete === 'password-new'
+          ? 'new-password'
+          : null;
+  if (!kind) return { autoComplete, textContentType, importantForAutofill };
+  const shared = {
+    importantForAutofill: importantForAutofill ?? 'yes',
+    autoCorrect: false as const,
+    spellCheck: false as const,
+  };
+  if (kind === 'login-id') {
+    const username = autoComplete === 'username';
+    return {
+      ...shared,
+      autoComplete: username ? 'username' : 'email',
+      textContentType: textContentType ?? (username ? 'username' : 'emailAddress'),
+    };
+  }
+  if (kind === 'current-password') {
+    return {
+      ...shared,
+      autoComplete: Platform.OS === 'android' ? 'password' : 'current-password',
+      textContentType: textContentType ?? 'password',
+    };
+  }
+  return {
+    ...shared,
+    autoComplete: Platform.OS === 'android' ? 'password-new' : 'new-password',
+    textContentType: textContentType ?? 'newPassword',
+  };
 }
 
 export function Field({
@@ -307,7 +375,8 @@ export function Field({
   const masked = Boolean(secureTextEntry) && hidden;
   const box = useRef<View>(null);
   const reveal = useContext(FieldScrollContext);
-  const { onFocus, ...rest } = props;
+  const { onFocus, onChange, onChangeText, value, autoComplete, textContentType, importantForAutofill, ...rest } = props;
+  const autofill = credentialAutofill(autoComplete, textContentType, importantForAutofill);
   return (
     <View ref={box} style={{ gap: 8 }}>
       <View style={ui.fieldLabel}>
@@ -320,12 +389,20 @@ export function Field({
           style={[ui.input, secureTextEntry ? { paddingRight: 48 } : null]}
           accessibilityLabel={label}
           secureTextEntry={masked}
+          value={value}
+          onChangeText={onChangeText}
+          onChange={(event) => {
+            onChange?.(event);
+            const next = event.nativeEvent.text;
+            if (typeof value === 'string' && typeof next === 'string' && next !== value) onChangeText?.(next);
+          }}
           onFocus={(event) => {
             setActiveMenu(null);
             onFocus?.(event);
             setTimeout(() => reveal(box.current, 'input'), 40);
           }}
           {...rest}
+          {...autofill}
         />
         {secureTextEntry ? (
           <Pressable
@@ -391,29 +468,7 @@ export function SecondaryButton({
   );
 }
 
-export function Notice({ tone, children }: { tone: 'danger' | 'success'; children: React.ReactNode }) {
-  const { ui } = useTheme();
-  if (!children) return null;
-  const danger = tone === 'danger';
-  return (
-    <View accessibilityRole="alert" style={danger ? ui.alertDanger : ui.alertSuccess}>
-      <Text style={danger ? ui.alertDangerText : ui.alertSuccessText}>{children}</Text>
-    </View>
-  );
-}
-
-export function ErrorText({ children }: { children: React.ReactNode }) {
-  return <Notice tone="danger">{children}</Notice>;
-}
-
-export function showAlert(message: string, title = 'Eksik bilgi'): void {
-  Alert.alert(title, message);
-}
-
-export function flagMissing(setMessage: (message: string | null) => void, message: string): void {
-  setMessage(message);
-  showAlert(message);
-}
+export { flagMissing, showAlert } from './app-alert';
 
 export function GoogleMark() {
   const { ui } = useTheme();

@@ -1,13 +1,45 @@
-import type { Gender, InterestDto, MyProfileDto } from '@dating/types';
+import type {
+  CommunicationStyle,
+  EducationLevel,
+  Gender,
+  InterestDto,
+  KidsPreference,
+  LifestyleFrequency,
+  LoveStyle,
+  MyProfileDto,
+  PetStatus,
+  RelationshipIntention,
+  SexualOrientation,
+} from '@dating/types';
 import { Ionicons } from '@expo/vector-icons';
-import { MAX_BIO_LENGTH, MAX_INTERESTS, profileBasicsSchema } from '@dating/validation';
+import {
+  COMMUNICATION_LABELS,
+  DRINK_SMOKE_LABELS,
+  EDUCATION_LEVEL_LABELS,
+  EXERCISE_LABELS,
+  INTENTION_LABELS,
+  KIDS_LABELS,
+  LANGUAGE_OPTIONS,
+  LOVE_LABELS,
+  MAX_BIO_LENGTH,
+  MAX_INTERESTS,
+  MAX_LANGUAGES,
+  PET_LABELS,
+  SEXUAL_ORIENTATION_LABELS,
+  SOCIAL_LABELS,
+  UNIVERSITIES,
+  ZODIAC_LABELS,
+  profileBasicsSchema,
+} from '@dating/validation';
 import { api, errorMessage } from '@/api';
 import { captureLocation } from '@/place';
-import { SelectField } from '@/select-field';
-import { ErrorText, Field, PageHeading, PrimaryButton, ProfileMeter, Screen, flagMissing, showAlert } from '@/ui';
+import { SelectField, type SelectOption } from '@/select-field';
+import { useTheme } from '@/theme';
+import { Field, PageHeading, PrimaryButton, ProfileMeter, Screen, flagMissing, showAlert } from '@/ui';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
+import { Text } from 'react-native';
 
 const GENDER_OPTIONS = [
   { value: 'WOMAN', label: 'Kadın', icon: 'female' },
@@ -68,6 +100,25 @@ const INTEREST_FALLBACK: Array<keyof typeof Ionicons.glyphMap> = [
   'color-wand',
 ];
 
+const HEIGHTS: SelectOption[] = Array.from({ length: 81 }, (_, index) => {
+  const cm = 140 + index;
+  return { value: String(cm), label: `${cm} cm` };
+});
+
+const UNIVERSITY_OPTIONS: SelectOption[] = [
+  ...UNIVERSITIES.map((name) => ({ value: name, label: name })),
+  { value: '__other__', label: 'Listede yok' },
+];
+
+function choices<T extends string>(labels: Record<T, string>): SelectOption[] {
+  return (Object.keys(labels) as T[]).map((value) => ({ value, label: labels[value] }));
+}
+
+function BlockTitle({ children }: { children: string }) {
+  const { colors } = useTheme();
+  return <Text style={{ color: colors.text, fontSize: 18, fontWeight: '800', marginTop: 8 }}>{children}</Text>;
+}
+
 function missingProfileMessage(input: {
   firstName: string;
   username: string;
@@ -100,6 +151,7 @@ function profilePercent(input: { name: boolean; username: boolean; gender: boole
 
 export default function OnboardingProfile() {
   const router = useRouter();
+  const fromProfile = useLocalSearchParams<{ from?: string }>().from === 'profile';
   const queryClient = useQueryClient();
   const me = useQuery({ queryKey: ['profile', 'me'], queryFn: () => api<MyProfileDto>('/profile/me') });
   const interests = useQuery({ queryKey: ['interests'], queryFn: () => api<InterestDto[]>('/interests') });
@@ -107,18 +159,61 @@ export default function OnboardingProfile() {
   const [username, setUsername] = useState('');
   const [gender, setGender] = useState<Gender | null>(null);
   const [bio, setBio] = useState('');
+  const [heightCm, setHeightCm] = useState('');
+  const [occupation, setOccupation] = useState('');
+  const [educationLevel, setEducationLevel] = useState<EducationLevel | null>(null);
+  const [university, setUniversity] = useState('');
+  const [universityCustom, setUniversityCustom] = useState('');
+  const [sexualOrientation, setSexualOrientation] = useState<SexualOrientation | null>(null);
+  const [kids, setKids] = useState<KidsPreference | null>(null);
+  const [communicationStyle, setCommunicationStyle] = useState<CommunicationStyle | null>(null);
+  const [loveStyle, setLoveStyle] = useState<LoveStyle | null>(null);
+  const [drinking, setDrinking] = useState<LifestyleFrequency | null>(null);
+  const [smoking, setSmoking] = useState<LifestyleFrequency | null>(null);
+  const [exercise, setExercise] = useState<LifestyleFrequency | null>(null);
+  const [pets, setPets] = useState<PetStatus | null>(null);
+  const [socialMedia, setSocialMedia] = useState<LifestyleFrequency | null>(null);
+  const [relationshipIntention, setRelationshipIntention] = useState<RelationshipIntention | null>(null);
+  const [languages, setLanguages] = useState<string[]>(['tr']);
   const [selected, setSelected] = useState<number[]>([]);
-  const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const interestsError = interests.isError ? errorMessage(interests.error) : null;
 
   useEffect(() => {
     if (!me.data?.profile) return;
-    setFirstName(me.data.profile.firstName);
-    setUsername(me.data.profile.username);
-    setGender(me.data.profile.gender);
-    setBio(me.data.profile.bio ?? '');
+    const profile = me.data.profile;
+    setFirstName(profile.firstName);
+    setUsername(profile.username);
+    setGender(profile.gender);
+    setBio(profile.bio ?? '');
+    setHeightCm(profile.heightCm ? String(profile.heightCm) : '');
+    setOccupation(profile.occupation ?? '');
+    setEducationLevel(profile.educationLevel);
+    const school = profile.education ?? '';
+    if (school && (UNIVERSITIES as readonly string[]).includes(school)) {
+      setUniversity(school);
+      setUniversityCustom('');
+    } else if (school) {
+      setUniversity('__other__');
+      setUniversityCustom(school);
+    }
+    setSexualOrientation(profile.sexualOrientation);
+    setKids(profile.kids);
+    setCommunicationStyle(profile.communicationStyle);
+    setLoveStyle(profile.loveStyle);
+    setDrinking(profile.drinking);
+    setSmoking(profile.smoking);
+    setExercise(profile.exercise);
+    setPets(profile.pets);
+    setSocialMedia(profile.socialMedia);
+    setRelationshipIntention(profile.relationshipIntention);
+    if (profile.languages.length > 0) setLanguages(profile.languages);
     setSelected(me.data.interests.map((item) => item.id));
   }, [me.data]);
+
+  useEffect(() => {
+    if (interestsError) showAlert(interestsError, 'Yüklenemedi');
+  }, [interestsError]);
 
   const percent = profilePercent({
     name: firstName.trim().length > 0,
@@ -136,49 +231,68 @@ export default function OnboardingProfile() {
       bio,
       interests: selected.length,
     });
+    const school = university === '__other__' ? universityCustom.trim() : university;
     const parsed = profileBasicsSchema.safeParse({
       firstName,
       username,
       gender: gender ?? undefined,
       bio,
-      languages: ['tr'],
+      occupation,
+      education: school,
+      educationLevel: educationLevel ?? '',
+      sexualOrientation: sexualOrientation ?? '',
+      kids: kids ?? '',
+      communicationStyle: communicationStyle ?? '',
+      loveStyle: loveStyle ?? '',
+      pets: pets ?? '',
+      socialMedia: socialMedia ?? '',
+      heightCm: heightCm || '',
+      languages,
+      relationshipIntention: relationshipIntention ?? '',
+      drinking: drinking ?? '',
+      smoking: smoking ?? '',
+      exercise: exercise ?? '',
     });
     if (missing) {
-      flagMissing(setError, missing);
+      flagMissing(missing);
       return;
     }
     if (!parsed.success) {
-      flagMissing(setError, parsed.error.issues[0]?.message ?? 'Formu kontrol et.');
+      flagMissing(parsed.error.issues[0]?.message ?? 'Formu kontrol et.');
       return;
     }
     setBusy(true);
-    setError(null);
     try {
-      const place = await captureLocation(true);
-      if (!place) {
-        flagMissing(setError, 'Yakınınızdaki kişileri gösterebilmek için konum izni gerekir.');
+      const place = fromProfile ? null : await captureLocation(true);
+      if (!fromProfile && !place) {
+        flagMissing('Yakınınızdaki kişileri gösterebilmek için konum izni gerekir.');
         return;
       }
       await api('/profile/me', {
         method: 'PUT',
-        body: { ...parsed.data, city: place.city, country: place.country },
-      });
-      await api('/profile/me/interests', { method: 'PUT', body: { interestIds: selected } });
-      await api('/profile/me/location', {
-        method: 'PUT',
         body: {
-          latitude: place.latitude,
-          longitude: place.longitude,
-          city: place.city,
-          country: place.country,
+          ...parsed.data,
+          city: place?.city ?? me.data?.profile?.city ?? null,
+          country: place?.country ?? me.data?.profile?.country ?? null,
         },
       });
+      if (place) {
+        await api('/profile/me/location', {
+          method: 'PUT',
+          body: {
+            latitude: place.latitude,
+            longitude: place.longitude,
+            city: place.city,
+            country: place.country,
+          },
+        });
+      }
+      await api('/profile/me/interests', { method: 'PUT', body: { interestIds: selected } });
       await queryClient.invalidateQueries({ queryKey: ['profile', 'me'] });
-      router.push('/onboarding/photos');
+      if (fromProfile) router.back();
+      else router.push('/onboarding/photos');
     } catch (caught) {
-      const message = errorMessage(caught);
-      setError(message);
-      showAlert(message, 'Devam edilemedi');
+      showAlert(errorMessage(caught), 'Devam edilemedi');
     } finally {
       setBusy(false);
     }
@@ -187,7 +301,6 @@ export default function OnboardingProfile() {
   return (
     <Screen header>
       <PageHeading icon="person" title="Kendini tanıt" />
-      <ErrorText>{error}</ErrorText>
       <ProfileMeter percent={percent} centered />
       <Field label="İsim" icon="id-card" hint="Profilinizde görünecek ad." value={firstName} onChangeText={setFirstName} />
       <Field
@@ -206,6 +319,50 @@ export default function OnboardingProfile() {
         value={gender}
         onChange={(next) => setGender(next as Gender)}
       />
+      <SelectField
+        label="Cinsel yönelim"
+        icon="heart"
+        placeholder="Yönelim seçin"
+        options={choices(SEXUAL_ORIENTATION_LABELS)}
+        value={sexualOrientation}
+        onChange={(next) => setSexualOrientation(next as SexualOrientation)}
+      />
+      <SelectField
+        label="Boy"
+        icon="resize"
+        placeholder="Boy seçin"
+        options={HEIGHTS}
+        value={heightCm || null}
+        onChange={setHeightCm}
+      />
+      <Field
+        label="İş / çalıştığın yer"
+        icon="briefcase"
+        hint="Mesleğin ya da çalıştığın yer."
+        value={occupation}
+        onChangeText={setOccupation}
+      />
+      <SelectField
+        label="Eğitim seviyesi"
+        icon="school"
+        placeholder="Eğitim seviyesi seçin"
+        options={choices(EDUCATION_LEVEL_LABELS)}
+        value={educationLevel}
+        onChange={(next) => setEducationLevel(next as EducationLevel)}
+      />
+      <SelectField
+        label="Üniversite"
+        icon="library"
+        placeholder="Üniversite seçin"
+        options={UNIVERSITY_OPTIONS}
+        value={university || null}
+        onChange={setUniversity}
+      />
+      {university === '__other__' ? (
+        <Field label="Üniversitenin adı" icon="create" value={universityCustom} onChangeText={setUniversityCustom} />
+      ) : null}
+      <BlockTitle>Kısaca ben</BlockTitle>
+      {me.data ? <Field label="Burcun" icon="planet" value={ZODIAC_LABELS[me.data.zodiac]} editable={false} /> : null}
       <Field
         label="Biyografi"
         icon="create"
@@ -215,7 +372,89 @@ export default function OnboardingProfile() {
         maxLength={MAX_BIO_LENGTH}
         multiline
       />
-      {interests.isError ? <ErrorText>{errorMessage(interests.error)}</ErrorText> : null}
+      <SelectField
+        label="Çocuk istiyor musun?"
+        icon="happy"
+        placeholder="Seçin"
+        options={choices(KIDS_LABELS)}
+        value={kids}
+        onChange={(next) => setKids(next as KidsPreference)}
+      />
+      <SelectField
+        label="İletişim tarzın"
+        icon="chatbubbles"
+        placeholder="Nasıl iletişim kurarsın?"
+        options={choices(COMMUNICATION_LABELS)}
+        value={communicationStyle}
+        onChange={(next) => setCommunicationStyle(next as CommunicationStyle)}
+      />
+      <SelectField
+        label="Aşkını nasıl ifade edersin?"
+        icon="heart"
+        placeholder="Seçin"
+        options={choices(LOVE_LABELS)}
+        value={loveStyle}
+        onChange={(next) => setLoveStyle(next as LoveStyle)}
+      />
+      <BlockTitle>Yaşam tarzı</BlockTitle>
+      <SelectField
+        label="Evcil hayvanın var mı?"
+        icon="paw"
+        placeholder="Seçin"
+        options={choices(PET_LABELS)}
+        value={pets}
+        onChange={(next) => setPets(next as PetStatus)}
+      />
+      <SelectField
+        label="Ne sıklıkla içki içersin?"
+        icon="wine"
+        placeholder="Seçin"
+        options={choices(DRINK_SMOKE_LABELS)}
+        value={drinking}
+        onChange={(next) => setDrinking(next as LifestyleFrequency)}
+      />
+      <SelectField
+        label="Ne sıklıkla sigara içersin?"
+        icon="flame"
+        placeholder="Seçin"
+        options={choices(DRINK_SMOKE_LABELS)}
+        value={smoking}
+        onChange={(next) => setSmoking(next as LifestyleFrequency)}
+      />
+      <SelectField
+        label="Spor yapıyor musun?"
+        icon="barbell"
+        placeholder="Seçin"
+        options={choices(EXERCISE_LABELS)}
+        value={exercise}
+        onChange={(next) => setExercise(next as LifestyleFrequency)}
+      />
+      <SelectField
+        label="Sosyal medyada ne kadar aktifsin?"
+        icon="phone-portrait"
+        placeholder="Seçin"
+        options={choices(SOCIAL_LABELS)}
+        value={socialMedia}
+        onChange={(next) => setSocialMedia(next as LifestyleFrequency)}
+      />
+      <BlockTitle>Ne arıyorsun</BlockTitle>
+      <SelectField
+        label="İlişki beklentin"
+        icon="infinite"
+        placeholder="Seçin"
+        options={choices(INTENTION_LABELS)}
+        value={relationshipIntention}
+        onChange={(next) => setRelationshipIntention(next as RelationshipIntention)}
+      />
+      <SelectField
+        label="Bildiğin diller"
+        icon="language"
+        placeholder={`En fazla ${MAX_LANGUAGES} dil`}
+        multiple
+        options={LANGUAGE_OPTIONS.map((item) => ({ value: item.code, label: item.label }))}
+        values={languages}
+        onChangeMany={(next) => setLanguages(next.slice(0, MAX_LANGUAGES))}
+      />
       <SelectField
         label="İlgi alanları"
         icon="heart"

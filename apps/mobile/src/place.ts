@@ -1,5 +1,22 @@
+import { findKnownCity } from '@dating/validation';
 import * as Location from 'expo-location';
 import { countryByCode } from './countries';
+
+function tidy(value: string | null | undefined): string | null {
+  const trimmed = value?.replace(/\s+(Province|İli)$/i, '').trim();
+  return trimmed ? trimmed : null;
+}
+
+/** Türkiye'de sistem `city` alanına ilçeyi yazar. Profilde il (şehir) görünür. */
+function settlement(place: Location.LocationGeocodedAddress): string | null {
+  const country = place.isoCountryCode?.toUpperCase();
+  const region = tidy(place.region);
+  const city = tidy(place.city);
+  const subregion = tidy(place.subregion);
+  const raw = country === 'TR' ? (region ?? city ?? subregion) : (city ?? subregion ?? region);
+  if (!raw) return null;
+  return findKnownCity(raw)?.name ?? raw;
+}
 
 export interface DetectedPlace {
   countryCode: string;
@@ -43,7 +60,7 @@ async function detectFromGps(): Promise<DetectedPlace | null> {
   const places = await withTimeout(Location.reverseGeocodeAsync(position.coords), 8000);
   const place = places?.[0];
   if (!place) return null;
-  return asPlace(place.isoCountryCode, place.city ?? place.subregion ?? place.region, 'gps');
+  return asPlace(place.isoCountryCode, settlement(place), 'gps');
 }
 
 async function detectFromIp(): Promise<DetectedPlace | null> {
@@ -86,7 +103,7 @@ export async function captureLocation(ask: boolean): Promise<CapturedLocation | 
   return {
     latitude: position.coords.latitude,
     longitude: position.coords.longitude,
-    city: place?.city ?? place?.subregion ?? null,
+    city: place ? settlement(place) : null,
     country: code && countryByCode(code) ? code : null,
   };
 }

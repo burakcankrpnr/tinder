@@ -1,6 +1,6 @@
 import type { CatalogDto, CheckoutDto, EntitlementsDto } from '@dating/types';
 import { api, errorMessage } from '@/api';
-import { ErrorText, PrimaryButton, Screen, Subtitle, Title } from '@/ui';
+import { PrimaryButton, Screen, Subtitle, Title, showAlert } from '@/ui';
 import { useTheme } from '@/theme';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import * as Crypto from 'expo-crypto';
@@ -19,12 +19,10 @@ export default function SubscriptionScreen() {
     queryKey: ['entitlements'],
     queryFn: () => api<EntitlementsDto>('/billing/entitlements'),
   });
-  const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
 
   async function subscribe(planSlug: string) {
     setBusy(planSlug);
-    setError(null);
     try {
       const checkout = await api<CheckoutDto>('/payments/checkout', {
         method: 'POST',
@@ -37,7 +35,7 @@ export default function SubscriptionScreen() {
       });
       await queryClient.invalidateQueries({ queryKey: ['entitlements'] });
     } catch (caught) {
-      setError(errorMessage(caught));
+      showAlert(errorMessage(caught), 'Abonelik başlamadı');
     } finally {
       setBusy(null);
     }
@@ -45,12 +43,11 @@ export default function SubscriptionScreen() {
 
   async function cancel() {
     setBusy('cancel');
-    setError(null);
     try {
       await api('/billing/subscription/cancel', { method: 'POST' });
       await queryClient.invalidateQueries({ queryKey: ['entitlements'] });
     } catch (caught) {
-      setError(errorMessage(caught));
+      showAlert(errorMessage(caught), 'İptal edilemedi');
     } finally {
       setBusy(null);
     }
@@ -64,7 +61,6 @@ export default function SubscriptionScreen() {
       <Subtitle>
         Şu an {entitlements.data?.plan.name ?? '…'} paketindesin. Ödeme bu sürümde deneme kasasıdır; mağaza içi satın alma yoktur.
       </Subtitle>
-      <ErrorText>{error}</ErrorText>
       {plans.data?.plans.map((plan) => (
         <View key={plan.slug} style={[ui.card, { padding: 16, gap: 8 }]}>
           <Text style={{ color: colors.text, fontSize: 18, fontWeight: '700' }}>{plan.name}</Text>

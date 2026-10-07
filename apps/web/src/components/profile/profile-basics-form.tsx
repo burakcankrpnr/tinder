@@ -2,11 +2,17 @@
 
 import type { MyProfileDto, UsernameAvailabilityDto } from '@dating/types';
 import {
+  COMMUNICATION_STYLES,
+  EDUCATION_LEVELS,
   GENDERS,
+  KIDS_PREFERENCES,
   LIFESTYLE_FREQUENCIES,
+  LOVE_STYLES,
   MAX_BIO_LENGTH,
   MAX_LANGUAGES,
+  PET_STATUSES,
   RELATIONSHIP_INTENTIONS,
+  SEXUAL_ORIENTATIONS,
   type ProfileBasicsFormInput,
   type ProfileBasicsInput,
   profileBasicsSchema,
@@ -20,10 +26,18 @@ import { Controller, type DefaultValues, useForm, useWatch } from 'react-hook-fo
 import { ApiError, api } from '@/lib/api-client';
 import { applyServerErrors } from '@/lib/form-errors';
 import {
+  COMMUNICATION_LABELS,
+  EDUCATION_LEVEL_LABELS,
+  EXERCISE_LABELS,
   FREQUENCY_LABELS,
   GENDER_LABELS,
   INTENTION_LABELS,
+  KIDS_LABELS,
   LANGUAGE_LABELS,
+  LOVE_LABELS,
+  PET_LABELS,
+  SEXUAL_ORIENTATION_LABELS,
+  SOCIAL_LABELS,
 } from '@/lib/labels';
 import { queryKeys } from '@/lib/queries';
 import { InterestsPicker } from './interests-picker';
@@ -39,6 +53,13 @@ const FIELDS = [
   'country',
   'occupation',
   'education',
+  'educationLevel',
+  'sexualOrientation',
+  'kids',
+  'communicationStyle',
+  'loveStyle',
+  'pets',
+  'socialMedia',
   'heightCm',
   'languages',
   'relationshipIntention',
@@ -58,6 +79,13 @@ function defaultsFrom(me: MyProfileDto): DefaultValues<ProfileBasicsFormInput> {
     country: profile?.country ?? 'TR',
     occupation: profile?.occupation ?? '',
     education: profile?.education ?? '',
+    educationLevel: profile?.educationLevel ?? '',
+    sexualOrientation: profile?.sexualOrientation ?? '',
+    kids: profile?.kids ?? '',
+    communicationStyle: profile?.communicationStyle ?? '',
+    loveStyle: profile?.loveStyle ?? '',
+    pets: profile?.pets ?? '',
+    socialMedia: profile?.socialMedia ?? '',
     heightCm: profile?.heightCm ?? '',
     languages: profile?.languages ?? [],
     relationshipIntention: profile?.relationshipIntention ?? '',
@@ -218,11 +246,71 @@ export function ProfileBasicsForm({
           <Field label="Ülke kodu" error={errors.country?.message} hint="ör. TR" optional>
             <Input maxLength={2} autoComplete="country" className="uppercase" {...register('country')} />
           </Field>
-          <Field label="Meslek" error={errors.occupation?.message} optional>
+          <Field label="İş / çalıştığın yer" error={errors.occupation?.message} optional>
             <Input autoComplete="organization-title" {...register('occupation')} />
           </Field>
-          <Field label="Eğitim" error={errors.education?.message} optional>
+          <Field label="Eğitim seviyesi" error={errors.educationLevel?.message} optional>
+            <Select {...register('educationLevel')}>
+              <option value="">Belirtme</option>
+              {EDUCATION_LEVELS.map((level) => (
+                <option key={level} value={level}>
+                  {EDUCATION_LEVEL_LABELS[level]}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Field label="Üniversite" error={errors.education?.message} optional>
             <Input {...register('education')} />
+          </Field>
+          <Field label="Cinsel yönelim" error={errors.sexualOrientation?.message} optional>
+            <Select {...register('sexualOrientation')}>
+              <option value="">Belirtme</option>
+              {SEXUAL_ORIENTATIONS.map((value) => (
+                <option key={value} value={value}>
+                  {SEXUAL_ORIENTATION_LABELS[value]}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Field label="Çocuk istiyor musun?" error={errors.kids?.message} optional>
+            <Select {...register('kids')}>
+              <option value="">Belirtme</option>
+              {KIDS_PREFERENCES.map((value) => (
+                <option key={value} value={value}>
+                  {KIDS_LABELS[value]}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Field label="İletişim tarzın" error={errors.communicationStyle?.message} optional>
+            <Select {...register('communicationStyle')}>
+              <option value="">Belirtme</option>
+              {COMMUNICATION_STYLES.map((value) => (
+                <option key={value} value={value}>
+                  {COMMUNICATION_LABELS[value]}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Field label="Aşkını nasıl ifade edersin?" error={errors.loveStyle?.message} optional>
+            <Select {...register('loveStyle')}>
+              <option value="">Belirtme</option>
+              {LOVE_STYLES.map((value) => (
+                <option key={value} value={value}>
+                  {LOVE_LABELS[value]}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Field label="Evcil hayvanın var mı?" error={errors.pets?.message} optional>
+            <Select {...register('pets')}>
+              <option value="">Belirtme</option>
+              {PET_STATUSES.map((value) => (
+                <option key={value} value={value}>
+                  {PET_LABELS[value]}
+                </option>
+              ))}
+            </Select>
           </Field>
           <Field label="Boy (cm)" error={errors.heightCm?.message} optional>
             <Input type="number" inputMode="numeric" min={120} max={230} {...register('heightCm')} />
@@ -257,10 +345,17 @@ export function ProfileBasicsForm({
           />
         </Field>
         <div className="grid gap-4 sm:grid-cols-3">
-          {(['drinking', 'smoking', 'exercise'] as const).map((name) => (
+          {(['drinking', 'smoking', 'exercise', 'socialMedia'] as const).map((name) => (
             <Field
               key={name}
-              label={{ drinking: 'Alkol', smoking: 'Sigara', exercise: 'Spor' }[name]}
+              label={
+                {
+                  drinking: 'Ne sıklıkla içki içersin?',
+                  smoking: 'Ne sıklıkla sigara içersin?',
+                  exercise: 'Spor yapıyor musun?',
+                  socialMedia: 'Sosyal medyada ne kadar aktifsin?',
+                }[name]
+              }
               error={errors[name]?.message}
               optional
             >
@@ -268,7 +363,7 @@ export function ProfileBasicsForm({
                 <option value="">Belirtme</option>
                 {LIFESTYLE_FREQUENCIES.map((frequency) => (
                   <option key={frequency} value={frequency}>
-                    {FREQUENCY_LABELS[frequency]}
+                    {(name === 'exercise' ? EXERCISE_LABELS : name === 'socialMedia' ? SOCIAL_LABELS : FREQUENCY_LABELS)[frequency]}
                   </option>
                 ))}
               </Select>

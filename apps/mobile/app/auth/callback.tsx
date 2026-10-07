@@ -1,5 +1,5 @@
 import { useSession } from '@/session';
-import { ErrorText, Screen, Subtitle, Title } from '@/ui';
+import { Screen, Subtitle, Title, showAlert } from '@/ui';
 import { useTheme } from '@/theme';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect } from 'react';
@@ -14,23 +14,24 @@ export default function AuthCallbackScreen() {
   const oauthError = typeof params.error === 'string' ? params.error : '';
 
   useEffect(() => {
+    if (oauthError) {
+      showAlert(
+        oauthError === 'oauth_account_not_found'
+          ? 'Bu Google hesabı kayıtlı bir kullanıcıya bağlı değil. Önce kayıt ol.'
+          : 'Google ile giriş tamamlanamadı.',
+        'Giriş olmadı',
+      );
+    }
     if (!token) return;
     void adopt(token)
       .then(() => router.replace('/'))
       .catch(() => router.replace('/login'));
-  }, [adopt, router, token]);
+  }, [adopt, oauthError, router, token]);
 
   return (
     <Screen>
       <Title>Giriş</Title>
       {token ? <ActivityIndicator color={colors.primary} /> : null}
-      <ErrorText>
-        {oauthError === 'oauth_account_not_found'
-          ? 'Bu Google hesabı kayıtlı bir kullanıcıya bağlı değil. Önce kayıt ol.'
-          : oauthError
-            ? 'Google ile giriş tamamlanamadı.'
-            : null}
-      </ErrorText>
       {!token && !oauthError ? <Subtitle>Oturum bekleniyor.</Subtitle> : null}
     </Screen>
   );

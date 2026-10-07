@@ -80,6 +80,25 @@ export type RelationshipIntention =
   | 'FRIENDSHIP'
   | 'NOT_SURE';
 export type LifestyleFrequency = 'NEVER' | 'SOMETIMES' | 'OFTEN';
+export type SexualOrientation = 'STRAIGHT' | 'GAY' | 'LESBIAN' | 'BISEXUAL' | 'PANSEXUAL' | 'ASEXUAL' | 'QUEER' | 'UNSURE';
+export type EducationLevel = 'HIGH_SCHOOL' | 'ASSOCIATE' | 'BACHELOR' | 'MASTER' | 'DOCTORATE' | 'OTHER';
+export type KidsPreference = 'WANT' | 'DONT_WANT' | 'HAVE_AND_WANT' | 'HAVE_AND_DONT' | 'NOT_SURE';
+export type CommunicationStyle = 'TEXTER' | 'CALLER' | 'VIDEO' | 'BAD_TEXTER' | 'IN_PERSON';
+export type LoveStyle = 'GESTURES' | 'GIFTS' | 'TOUCH' | 'COMPLIMENTS' | 'TIME';
+export type PetStatus = 'DOG' | 'CAT' | 'OTHER' | 'NONE' | 'WANT_ONE';
+export type ZodiacSign =
+  | 'ARIES'
+  | 'TAURUS'
+  | 'GEMINI'
+  | 'CANCER'
+  | 'LEO'
+  | 'VIRGO'
+  | 'LIBRA'
+  | 'SCORPIO'
+  | 'SAGITTARIUS'
+  | 'CAPRICORN'
+  | 'AQUARIUS'
+  | 'PISCES';
 export type VerificationStatus = 'UNVERIFIED' | 'PENDING' | 'VERIFIED';
 export type PhotoStatus =
   | 'PENDING_UPLOAD'
@@ -127,6 +146,13 @@ export interface ProfileBasicsDto {
   country: string | null;
   occupation: string | null;
   education: string | null;
+  educationLevel: EducationLevel | null;
+  sexualOrientation: SexualOrientation | null;
+  kids: KidsPreference | null;
+  communicationStyle: CommunicationStyle | null;
+  loveStyle: LoveStyle | null;
+  pets: PetStatus | null;
+  socialMedia: LifestyleFrequency | null;
   heightCm: number | null;
   languages: string[];
   relationshipIntention: RelationshipIntention | null;
@@ -167,6 +193,7 @@ export interface ProfileShowcaseDto {
 
 export interface MyProfileDto {
   age: number;
+  zodiac: ZodiacSign;
   controls: ProfileControlsDto;
   showcase: ProfileShowcaseDto;
   profile:
@@ -200,6 +227,12 @@ export interface PublicProfileDto {
   country: string | null;
   occupation: string | null;
   education: string | null;
+  educationLevel: EducationLevel | null;
+  sexualOrientation: SexualOrientation | null;
+  zodiac: ZodiacSign;
+  kids: KidsPreference | null;
+  communicationStyle: CommunicationStyle | null;
+  loveStyle: LoveStyle | null;
   heightCm: number | null;
   languages: string[];
   relationshipIntention: RelationshipIntention | null;
@@ -207,6 +240,8 @@ export interface PublicProfileDto {
     drinking: LifestyleFrequency | null;
     smoking: LifestyleFrequency | null;
     exercise: LifestyleFrequency | null;
+    pets: PetStatus | null;
+    socialMedia: LifestyleFrequency | null;
   };
   interests: Array<Pick<InterestDto, 'slug' | 'name'>>;
   photos: Array<{ id: string; contentType: string; urls: PhotoUrlsDto }>;

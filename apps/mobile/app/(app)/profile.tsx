@@ -1,14 +1,31 @@
-import type { InterestDto, MediaHitDto, MediaKind, MediaPickDto, MyProfileDto, PhotoDto, ProfileControlsDto, ProfileShowcaseDto, RelationshipIntention } from '@dating/types';
+import type { InterestDto, MediaHitDto, MediaKind, MediaPickDto, MyProfileDto, PhotoDto, ProfileControlsDto, ProfileShowcaseDto } from '@dating/types';
 import { Ionicons } from '@expo/vector-icons';
-import { MAX_BIO_LENGTH, MAX_INTERESTS } from '@dating/validation';
+import {
+  COMMUNICATION_LABELS,
+  DRINK_SMOKE_LABELS,
+  EDUCATION_LEVEL_LABELS,
+  EXERCISE_LABELS,
+  INTENTION_LABELS,
+  KIDS_LABELS,
+  LANGUAGE_OPTIONS,
+  LOVE_LABELS,
+  MAX_BIO_LENGTH,
+  MAX_INTERESTS,
+  PET_LABELS,
+  SEXUAL_ORIENTATION_LABELS,
+  SOCIAL_LABELS,
+  ZODIAC_LABELS,
+} from '@dating/validation';
 import { api, deviceUrl, errorMessage } from '@/api';
+import { showAlert } from '@/ui';
 import { useTheme } from '@/theme';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   Image,
   Modal,
+  PanResponder,
   Pressable,
   ScrollView,
   Switch,
@@ -40,14 +57,9 @@ type Sheet =
   | { kind: 'interests' }
   | { kind: 'list'; field: ListField; title: string; placeholder: string };
 
-const INTENTION_LABELS: Record<RelationshipIntention, string> = {
-  LONG_TERM: 'Uzun süreli ilişki',
-  LONG_TERM_OPEN_TO_SHORT: 'Uzun süreli, kısaya açık',
-  SHORT_TERM_OPEN_TO_LONG: 'Kısa süreli, uzuna açık',
-  SHORT_TERM: 'Kısa süreli',
-  FRIENDSHIP: 'Yeni arkadaşlar',
-  NOT_SURE: 'Henüz karar vermedim',
-};
+function languageName(code: string): string {
+  return LANGUAGE_OPTIONS.find((item) => item.code === code)?.label ?? code.toUpperCase();
+}
 
 function previewNames(names: string[], empty: string): string {
   if (names.length === 0) return empty;
@@ -60,7 +72,7 @@ function joinPreview(items: MediaPickDto[], empty: string): string {
 }
 
 function lifestyleFilled(profile: NonNullable<MyProfileDto['profile']>): number {
-  return [profile.drinking, profile.smoking, profile.exercise].filter(Boolean).length;
+  return [profile.drinking, profile.smoking, profile.exercise, profile.pets, profile.socialMedia].filter(Boolean).length;
 }
 
 export default function ProfileScreen() {
@@ -79,7 +91,6 @@ export default function ProfileScreen() {
   const [mediaQuery, setMediaQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [picked, setPicked] = useState<number[]>([]);
-  const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [photoBusy, setPhotoBusy] = useState(false);
   const mediaKind = sheet?.kind === 'list' ? MEDIA_KIND[sheet.field] : null;
@@ -89,6 +100,11 @@ export default function ProfileScreen() {
       api<MediaHitDto[]>(`/media/search?kind=${mediaKind}&q=${encodeURIComponent(debouncedQuery)}`),
     enabled: mediaKind !== null,
   });
+  const mediaError = mediaHits.isError ? errorMessage(mediaHits.error) : null;
+
+  useEffect(() => {
+    if (mediaError) showAlert(mediaError, 'Arama olmadı');
+  }, [mediaError]);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedQuery(mediaQuery.trim()), 300);
@@ -103,18 +119,16 @@ export default function ProfileScreen() {
 
   function close() {
     setSheet(null);
-    setError(null);
   }
 
   async function save(path: string, body: unknown) {
     setBusy(true);
-    setError(null);
     try {
       const next = await api<MyProfileDto>(path, { method: 'PUT', body });
       queryClient.setQueryData(['profile', 'me'], next);
       close();
     } catch (caught) {
-      setError(errorMessage(caught));
+      showAlert(errorMessage(caught), 'Kaydedilemedi');
     } finally {
       setBusy(false);
     }
@@ -129,7 +143,7 @@ export default function ProfileScreen() {
       queryClient.setQueryData(['profile', 'me'], next);
     } catch (caught) {
       queryClient.setQueryData(['profile', 'me'], previous);
-      setError(errorMessage(caught));
+      showAlert(errorMessage(caught), 'Kaydedilemedi');
     }
   }
 
@@ -137,18 +151,11 @@ export default function ProfileScreen() {
     setDraftList([...(me.data?.showcase[field] ?? [])]);
     setMediaQuery('');
     setDebouncedQuery('');
-    setError(null);
     setSheet({ kind: 'list', field, title, placeholder });
   }
 
-  async function movePhoto(index: number, direction: -1 | 1) {
-    const target = index + direction;
-    if (photoBusy || target < 0 || target >= photos.length) return;
-    const ids = photos.map((item) => item.id);
-    const next = [...ids];
-    const [moved] = next.splice(index, 1);
-    if (!moved) return;
-    next.splice(target, 0, moved);
+  async function commitPhotoOrder(next: string[]) {
+    if (photoBusy) return;
     const previous = queryClient.getQueryData<MyProfileDto>(['profile', 'me']);
     if (previous) {
       const byId = new Map(previous.photos.map((item) => [item.id, item]));
@@ -165,7 +172,7 @@ export default function ProfileScreen() {
       await queryClient.invalidateQueries({ queryKey: ['photos'] });
     } catch (caught) {
       if (previous) queryClient.setQueryData(['profile', 'me'], previous);
-      setError(errorMessage(caught));
+      showAlert(errorMessage(caught), 'Sıra değişmedi');
     } finally {
       setPhotoBusy(false);
     }
@@ -193,69 +200,66 @@ export default function ProfileScreen() {
               <Text style={{ color: colors.textMuted, fontSize: 15 }}>Ön izleme ›</Text>
             </Pressable>
           </View>
-          <CircleButton icon="people-outline" label="Profil önizleme" onPress={() => setSheet({ kind: 'preview' })} />
+          <CircleButton icon="people-outline" label="Çifte randevu" onPress={() => router.push('/double-date')} />
           <CircleButton icon="settings-outline" label="Ayarlar" onPress={() => router.push('/settings')} />
         </View>
 
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
-          {profile?.city ? <Chip icon="home-outline" label={profile.city} /> : null}
-          {profile?.heightCm ? <Chip icon="create-outline" label={`${profile.heightCm} cm`} /> : null}
+          {profile?.city ? <Chip icon="business-outline" label={profile.city} /> : null}
+          {profile?.heightCm ? <Chip icon="body-outline" label={`${profile.heightCm} cm`} /> : null}
           {profile?.occupation ? <Chip icon="briefcase-outline" label={profile.occupation} /> : null}
+          {profile?.education ? <Chip icon="school-outline" label={profile.education} /> : null}
+          {profile?.educationLevel ? <Chip icon="library-outline" label={EDUCATION_LEVEL_LABELS[profile.educationLevel]} /> : null}
+          {profile?.sexualOrientation ? (
+            <Chip icon="heart-outline" label={SEXUAL_ORIENTATION_LABELS[profile.sexualOrientation]} />
+          ) : null}
         </ScrollView>
 
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
           <Chip icon="grid-outline" label="Kısaca Ben" onPress={() => { setDraft(profile?.bio ?? ''); setSheet({ kind: 'bio' }); }} />
-          {profile ? <Chip icon="wine-outline" label={`Yaşam Tarzı (${lifestyleFilled(profile)}/3)`} /> : null}
+          {me.data ? <Chip icon="planet-outline" label={ZODIAC_LABELS[me.data.zodiac]} /> : null}
+          {profile?.kids ? <Chip icon="happy-outline" label={KIDS_LABELS[profile.kids]} /> : null}
+          {profile?.communicationStyle ? <Chip icon="chatbubbles-outline" label={COMMUNICATION_LABELS[profile.communicationStyle]} /> : null}
+          {profile?.loveStyle ? <Chip icon="heart-circle-outline" label={LOVE_LABELS[profile.loveStyle]} /> : null}
+          {profile ? <Chip icon="wine-outline" label={`Yaşam Tarzı (${lifestyleFilled(profile)}/5)`} /> : null}
+          {profile?.pets ? <Chip icon="paw-outline" label={PET_LABELS[profile.pets]} /> : null}
+          {profile?.drinking ? <Chip icon="wine-outline" label={`İçki: ${DRINK_SMOKE_LABELS[profile.drinking]}`} /> : null}
+          {profile?.smoking ? <Chip icon="flame-outline" label={`Sigara: ${DRINK_SMOKE_LABELS[profile.smoking]}`} /> : null}
+          {profile?.exercise ? <Chip icon="barbell-outline" label={`Spor: ${EXERCISE_LABELS[profile.exercise]}`} /> : null}
+          {profile?.socialMedia ? <Chip icon="phone-portrait-outline" label={`Sosyal medya: ${SOCIAL_LABELS[profile.socialMedia]}`} /> : null}
           {profile?.relationshipIntention ? (
             <Chip icon="infinite-outline" label={INTENTION_LABELS[profile.relationshipIntention]} />
           ) : null}
           {profile && profile.languages.length > 0 ? (
-            <Chip icon="language-outline" label={profile.languages[0]?.toUpperCase() ?? ''} />
+            <Chip icon="language-outline" label={profile.languages.map(languageName).join(', ')} />
           ) : null}
         </ScrollView>
 
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => router.push({ pathname: '/onboarding/profile', params: { from: 'profile' } })}
+          style={{
+            backgroundColor: colors.surface,
+            borderRadius: 999,
+            paddingVertical: 14,
+            paddingHorizontal: 18,
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}
+        >
+          <Text style={{ color: colors.text, fontSize: 16, fontWeight: '700' }}>Bilgilerini düzenle</Text>
+          <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
+        </Pressable>
+
         <Section title="Fotoğraflarım">
           <View style={{ backgroundColor: colors.surface, borderRadius: 22, padding: 10, gap: 12 }}>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
-              {photos.length === 0 ? (
-                <View style={{ width: 96, height: 128, borderRadius: 16, backgroundColor: colors.surface2, alignItems: 'center', justifyContent: 'center' }}>
-                  <Ionicons name="image-outline" size={28} color={colors.textMuted} />
-                </View>
-              ) : (
-                photos.map((photo, index) => (
-                  <View key={photo.id} style={{ width: 96, height: 128 }}>
-                    {photo.urls ? (
-                      <Image
-                        source={{ uri: deviceUrl(photo.urls.medium) }}
-                        style={{ width: 96, height: 128, borderRadius: 16 }}
-                        accessibilityIgnoresInvertColors
-                      />
-                    ) : (
-                      <View style={{ width: 96, height: 128, borderRadius: 16, backgroundColor: colors.surface2, alignItems: 'center', justifyContent: 'center' }}>
-                        <Ionicons name="time" size={24} color={colors.textMuted} />
-                      </View>
-                    )}
-                    {photos.length > 1 ? (
-                      <View style={{ position: 'absolute', left: 4, right: 4, bottom: 4, flexDirection: 'row', justifyContent: 'space-between' }}>
-                        {index > 0 ? (
-                          <PhotoMove label="Sola al" icon="chevron-back" disabled={photoBusy} onPress={() => void movePhoto(index, -1)} />
-                        ) : (
-                          <View />
-                        )}
-                        {index < photos.length - 1 ? (
-                          <PhotoMove label="Sağa al" icon="chevron-forward" disabled={photoBusy} onPress={() => void movePhoto(index, 1)} />
-                        ) : null}
-                      </View>
-                    ) : null}
-                  </View>
-                ))
-              )}
-            </ScrollView>
+            <PhotoStrip photos={photos} busy={photoBusy} onReorder={(ids) => void commitPhotoOrder(ids)} />
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 4, paddingBottom: 4 }}>
               <Text style={{ color: colors.textMuted, flex: 1, fontSize: 14, lineHeight: 20 }}>
                 {photos.length < 4
-                  ? 'Uzman tavsiyesi: Fotoğraflarını daha da çeşitlendir. Sırayı oklarla değiştir.'
-                  : 'Sırayı fotoğrafın üzerindeki oklarla değiştir.'}
+                  ? 'Uzman tavsiyesi: Fotoğraflarını daha da çeşitlendir. Sırayı tutup sürükleyerek değiştir.'
+                  : 'Sırayı tutup sürükleyerek değiştir.'}
               </Text>
               <Pressable
                 accessibilityRole="button"
@@ -275,7 +279,6 @@ export default function ProfileScreen() {
               value={profile?.bio?.trim() || 'Kendinden bahset'}
               onPress={() => {
                 setDraft(profile?.bio ?? '');
-                setError(null);
                 setSheet({ kind: 'bio' });
               }}
             />
@@ -284,7 +287,6 @@ export default function ProfileScreen() {
               value={showcase?.obsession?.trim() || 'Bir cevap yaz'}
               onPress={() => {
                 setDraft(showcase?.obsession ?? '');
-                setError(null);
                 setSheet({ kind: 'obsession' });
               }}
             />
@@ -300,7 +302,6 @@ export default function ProfileScreen() {
               filled={interests.length > 0}
               onAdd={() => {
                 setPicked(interests.map((item) => item.id));
-                setError(null);
                 setSheet({ kind: 'interests' });
               }}
             />
@@ -360,7 +361,6 @@ export default function ProfileScreen() {
         <Pressable
           accessibilityRole="button"
           onPress={() => {
-            setError(null);
             setSheet({ kind: 'controls' });
           }}
           style={{
@@ -447,7 +447,6 @@ export default function ProfileScreen() {
             </Text>
             <View style={{ width: 36 }} />
           </View>
-          {error ? <Text style={{ color: colors.danger }}>{error}</Text> : null}
           <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: 14, paddingBottom: 8 }}>
             {sheet?.kind === 'controls' && controls ? (
               <View style={{ gap: 12 }}>
@@ -538,6 +537,13 @@ export default function ProfileScreen() {
                         country: profile.country,
                         occupation: profile.occupation,
                         education: profile.education,
+                        educationLevel: profile.educationLevel,
+                        sexualOrientation: profile.sexualOrientation,
+                        kids: profile.kids,
+                        communicationStyle: profile.communicationStyle,
+                        loveStyle: profile.loveStyle,
+                        pets: profile.pets,
+                        socialMedia: profile.socialMedia,
                         heightCm: profile.heightCm,
                         languages: profile.languages,
                         relationshipIntention: profile.relationshipIntention,
@@ -576,7 +582,6 @@ export default function ProfileScreen() {
                   style={{ color: colors.text, backgroundColor: colors.surface2, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12, fontSize: 16 }}
                 />
                 {mediaHits.isPending ? <Text style={{ color: colors.textMuted }}>Aranıyor…</Text> : null}
-                {mediaHits.isError ? <Text style={{ color: colors.danger }}>{errorMessage(mediaHits.error)}</Text> : null}
                 {(mediaHits.data ?? []).map((hit) => {
                   const on = draftList.some((item) => item.title === hit.title);
                   return (
@@ -746,29 +751,153 @@ function PromptCard({ label, value, onPress }: { label: string; value: string; o
   );
 }
 
-function PhotoMove({
-  label,
-  icon,
-  disabled,
-  onPress,
+const PHOTO_WIDTH = 96;
+const PHOTO_GAP = 8;
+const PHOTO_SLOT = PHOTO_WIDTH + PHOTO_GAP;
+
+function PhotoStrip({
+  photos,
+  busy,
+  onReorder,
 }: {
-  label: string;
-  icon: keyof typeof Ionicons.glyphMap;
-  disabled: boolean;
-  onPress: () => void;
+  photos: PhotoDto[];
+  busy: boolean;
+  onReorder: (ids: string[]) => void;
 }) {
   const { colors } = useTheme();
+  const scrollRef = useRef<ScrollView>(null);
+  const scrollX = useRef(0);
+  const viewport = useRef(0);
+  const touches = useRef<Record<number, number>>({});
+  const photosRef = useRef(photos);
+  const busyRef = useRef(busy);
+  const onReorderRef = useRef(onReorder);
+  photosRef.current = photos;
+  busyRef.current = busy;
+  onReorderRef.current = onReorder;
+  const [drag, setDrag] = useState<{ index: number; dx: number } | null>(null);
+
+  const pans = useMemo(
+    () =>
+      Array.from({ length: photos.length }, (_, index) => {
+        let armed = false;
+        let grantScroll = 0;
+        return PanResponder.create({
+          onMoveShouldSetPanResponder: (_, gesture) => {
+            if (busyRef.current || photosRef.current.length < 2) return false;
+            const held = Date.now() - (touches.current[index] ?? 0) > 280;
+            if (held) return Math.abs(gesture.dx) > 2 || Math.abs(gesture.dy) > 2;
+            return Math.abs(gesture.dx) > 10 && Math.abs(gesture.dx) > Math.abs(gesture.dy);
+          },
+          onPanResponderTerminationRequest: () => !armed,
+          onPanResponderGrant: () => {
+            grantScroll = scrollX.current;
+            armed = Date.now() - (touches.current[index] ?? 0) > 280;
+            if (armed) setDrag({ index, dx: 0 });
+          },
+          onPanResponderMove: (_, gesture) => {
+            if (!armed) {
+              const width = photosRef.current.length * PHOTO_WIDTH + Math.max(0, photosRef.current.length - 1) * PHOTO_GAP;
+              const max = Math.max(0, width - viewport.current);
+              const next = Math.max(0, Math.min(max, grantScroll - gesture.dx));
+              scrollX.current = next;
+              scrollRef.current?.scrollTo({ x: next, animated: false });
+              return;
+            }
+            setDrag({ index, dx: gesture.dx });
+          },
+          onPanResponderRelease: (_, gesture) => {
+            if (armed) {
+              const count = photosRef.current.length;
+              const to = Math.max(0, Math.min(count - 1, index + Math.round(gesture.dx / PHOTO_SLOT)));
+              if (to !== index) {
+                const ids = photosRef.current.map((item) => item.id);
+                const next = [...ids];
+                const [moved] = next.splice(index, 1);
+                if (moved) {
+                  next.splice(to, 0, moved);
+                  onReorderRef.current(next);
+                }
+              }
+            }
+            armed = false;
+            setDrag(null);
+          },
+          onPanResponderTerminate: () => {
+            armed = false;
+            setDrag(null);
+          },
+        });
+      }),
+    [photos.length],
+  );
+
+  const from = drag?.index ?? -1;
+  const hover = drag ? Math.max(0, Math.min(photos.length - 1, from + Math.round(drag.dx / PHOTO_SLOT))) : -1;
+
+  if (photos.length === 0) {
+    return (
+      <View style={{ width: PHOTO_WIDTH, height: 128, borderRadius: 16, backgroundColor: colors.surface2, alignItems: 'center', justifyContent: 'center' }}>
+        <Ionicons name="image-outline" size={28} color={colors.textMuted} />
+      </View>
+    );
+  }
+
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      disabled={disabled}
-      onPress={onPress}
-      hitSlop={6}
-      style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: `${colors.photoScrim}CC`, alignItems: 'center', justifyContent: 'center' }}
+    <ScrollView
+      ref={scrollRef}
+      horizontal
+      scrollEnabled={drag === null}
+      showsHorizontalScrollIndicator={false}
+      onLayout={(event) => {
+        viewport.current = event.nativeEvent.layout.width;
+      }}
+      onScroll={(event) => {
+        scrollX.current = event.nativeEvent.contentOffset.x;
+      }}
+      scrollEventThrottle={16}
+      contentContainerStyle={{ gap: PHOTO_GAP }}
     >
-      <Ionicons name={icon} size={16} color={colors.onPhoto} />
-    </Pressable>
+      {photos.map((photo, index) => {
+        let translateX = 0;
+        if (drag) {
+          if (index === from) translateX = drag.dx;
+          else if (from < hover && index > from && index <= hover) translateX = -PHOTO_SLOT;
+          else if (hover < from && index >= hover && index < from) translateX = PHOTO_SLOT;
+        }
+        return (
+          <View
+            key={photo.id}
+            accessibilityRole="image"
+            accessibilityLabel={`Fotoğraf ${index + 1}. Sırayı değiştirmek için basılı tutup sürükle.`}
+            onTouchStart={() => {
+              touches.current[index] = Date.now();
+            }}
+            {...pans[index]?.panHandlers}
+            style={{
+              width: PHOTO_WIDTH,
+              height: 128,
+              zIndex: index === from ? 2 : 0,
+              transform: [{ translateX }, { scale: index === from ? 1.05 : 1 }],
+            }}
+          >
+            {photo.urls ? (
+              <View pointerEvents="none">
+                <Image
+                  source={{ uri: deviceUrl(photo.urls.medium) }}
+                  style={{ width: PHOTO_WIDTH, height: 128, borderRadius: 16 }}
+                  accessibilityIgnoresInvertColors
+                />
+              </View>
+            ) : (
+              <View style={{ width: PHOTO_WIDTH, height: 128, borderRadius: 16, backgroundColor: colors.surface2, alignItems: 'center', justifyContent: 'center' }}>
+                <Ionicons name="time" size={24} color={colors.textMuted} />
+              </View>
+            )}
+          </View>
+        );
+      })}
+    </ScrollView>
   );
 }
 

@@ -2,14 +2,14 @@ import type { PhotoDto } from '@dating/types';
 import { Ionicons } from '@expo/vector-icons';
 import { MAX_VIDEO_SECONDS, MEDIA_CONTENT_TYPES, type MediaContentType } from '@dating/validation';
 import { api, deviceUrl, errorMessage, uploadPhotoContent } from '@/api';
-import { ErrorText, PageHeading, PrimaryButton, Screen, SecondaryButton, StepBack, flagMissing, showAlert } from '@/ui';
+import { PageHeading, PrimaryButton, Screen, SecondaryButton, StepBack, flagMissing, showAlert } from '@/ui';
 import { useTheme } from '@/theme';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
-import { Image, Pressable, Text, View } from 'react-native';
+import { useMemo, useRef, useState } from 'react';
+import { Image, PanResponder, Pressable, Text, View } from 'react-native';
 
 const SLOT_COUNT = 9;
 
@@ -21,6 +21,20 @@ function mediaTypeOf(mime: string | null | undefined): MediaContentType | null {
 
 function isVideoType(value: string | null | undefined): boolean {
   return Boolean(value?.startsWith('video/'));
+}
+
+function dropSlot(from: number, dx: number, dy: number, count: number, width: number): number {
+  const gap = 8;
+  const cell = width > 0 ? (width - gap * 2) / 3 : 0;
+  if (cell <= 0 || count < 1) return from;
+  const stride = cell + gap;
+  const col = from % 3;
+  const row = Math.floor(from / 3);
+  const x = col * stride + dx + cell / 2;
+  const y = row * stride + dy + cell / 2;
+  const nextCol = Math.max(0, Math.min(2, Math.floor(x / stride)));
+  const nextRow = Math.max(0, Math.min(2, Math.floor(y / stride)));
+  return Math.max(0, Math.min(count - 1, nextRow * 3 + nextCol));
 }
 
 function secondsOf(duration: number | null | undefined): number | null {
@@ -53,10 +67,69 @@ export default function OnboardingPhotos() {
   const photos = useQuery({ queryKey: ['photos'], queryFn: () => api<PhotoDto[]>('/photos') });
   const [localUris, setLocalUris] = useState<Record<string, string>>({});
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [gridWidth, setGridWidth] = useState(0);
+  const [drag, setDrag] = useState<{ index: number; dx: number; dy: number } | null>(null);
   const ordered = [...(photos.data ?? [])].sort((a, b) => a.position - b.position);
   const selectedIndex = ordered.findIndex((photo) => photo.id === selectedId);
+  const orderedRef = useRef(ordered);
+  const busyRef = useRef(busy);
+  const gridWidthRef = useRef(0);
+  const touches = useRef<Record<number, number>>({});
+  const dragged = useRef(false);
+  const reorderRef = useRef<(ids: string[]) => void>(() => undefined);
+  orderedRef.current = ordered;
+  busyRef.current = busy;
+  gridWidthRef.current = gridWidth;
+
+  const cellPans = useMemo(
+    () =>
+      Array.from({ length: SLOT_COUNT }, (_, index) => {
+        let armed = false;
+        return PanResponder.create({
+          onMoveShouldSetPanResponder: (_, gesture) => {
+            if (busyRef.current || orderedRef.current.length < 2 || !orderedRef.current[index]) return false;
+            const held = Date.now() - (touches.current[index] ?? 0) > 280;
+            if (!held) return false;
+            return Math.abs(gesture.dx) > 3 || Math.abs(gesture.dy) > 3;
+          },
+          onPanResponderTerminationRequest: () => !armed,
+          onPanResponderGrant: () => {
+            armed = true;
+            dragged.current = true;
+            setSelectedId(null);
+            setDrag({ index, dx: 0, dy: 0 });
+          },
+          onPanResponderMove: (_, gesture) => {
+            if (!armed) return;
+            setDrag({ index, dx: gesture.dx, dy: gesture.dy });
+          },
+          onPanResponderRelease: (_, gesture) => {
+            if (armed) {
+              const list = orderedRef.current;
+              const to = dropSlot(index, gesture.dx, gesture.dy, list.length, gridWidthRef.current);
+              if (to !== index) {
+                const ids = list.map((item) => item.id);
+                const next = [...ids];
+                const [moved] = next.splice(index, 1);
+                if (moved) {
+                  next.splice(to, 0, moved);
+                  void reorderRef.current(next);
+                }
+              }
+            }
+            armed = false;
+            setDrag(null);
+          },
+          onPanResponderTerminate: () => {
+            armed = false;
+            dragged.current = false;
+            setDrag(null);
+          },
+        });
+      }),
+    [],
+  );
 
   async function refresh() {
     await queryClient.invalidateQueries({ queryKey: ['photos'] });
@@ -64,12 +137,12 @@ export default function OnboardingPhotos() {
 
   async function addPhoto() {
     if (ordered.length >= SLOT_COUNT) {
-      flagMissing(setError, 'En fazla 9 fotoğraf ekleyebilirsiniz.');
+      flagMissing('En fazla 9 fotoğraf ekleyebilirsiniz.');
       return;
     }
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
-      flagMissing(setError, 'Fotoğraf eklemek için galeri izni gerekir.');
+      flagMissing('Fotoğraf eklemek için galeri izni gerekir.');
       return;
     }
     const picked = await ImagePicker.launchImageLibraryAsync({
@@ -83,16 +156,15 @@ export default function OnboardingPhotos() {
     const video = asset.type === 'video' || isVideoType(asset.mimeType);
     const seconds = secondsOf(asset.duration);
     if (video && seconds !== null && seconds > MAX_VIDEO_SECONDS) {
-      flagMissing(setError, 'Video en fazla 15 saniye olabilir.');
+      flagMissing('Video en fazla 15 saniye olabilir.');
       return;
     }
     const contentType = mediaTypeOf(asset.mimeType) ?? (video ? 'video/mp4' : 'image/jpeg');
     if (!video && asset.mimeType && !mediaTypeOf(asset.mimeType)) {
-      flagMissing(setError, 'Fotoğraf veya en fazla 15 saniyelik video seçin.');
+      flagMissing('Fotoğraf veya en fazla 15 saniyelik video seçin.');
       return;
     }
     setBusy(true);
-    setError(null);
     try {
       const size = await byteSize(asset.uri, asset.fileSize);
       const created = await api<{ photo: PhotoDto; upload: { url: string; fields: Record<string, string> } }>(
@@ -108,9 +180,7 @@ export default function OnboardingPhotos() {
       setLocalUris((current) => ({ ...current, [created.photo.id]: asset.uri }));
       await refresh();
     } catch (caught) {
-      const message = errorMessage(caught);
-      setError(message);
-      showAlert(message, 'Fotoğraf eklenemedi');
+      showAlert(errorMessage(caught), 'Fotoğraf eklenemedi');
     } finally {
       setBusy(false);
     }
@@ -118,17 +188,17 @@ export default function OnboardingPhotos() {
 
   async function reorder(ids: string[]) {
     setBusy(true);
-    setError(null);
     try {
       await api('/photos/order', { method: 'PUT', body: { ids } });
       setSelectedId(null);
       await refresh();
     } catch (caught) {
-      setError(errorMessage(caught));
+      showAlert(errorMessage(caught), 'Sıra değişmedi');
     } finally {
       setBusy(false);
     }
   }
+  reorderRef.current = reorder;
 
   function onSlot(index: number) {
     const photo = ordered[index];
@@ -153,13 +223,12 @@ export default function OnboardingPhotos() {
   async function removeSelected() {
     if (!selectedId) return;
     setBusy(true);
-    setError(null);
     try {
       await api(`/photos/${selectedId}`, { method: 'DELETE' });
       setSelectedId(null);
       await refresh();
     } catch (caught) {
-      setError(errorMessage(caught));
+      showAlert(errorMessage(caught), 'Fotoğraf silinemedi');
     } finally {
       setBusy(false);
     }
@@ -197,10 +266,16 @@ export default function OnboardingPhotos() {
       <PageHeading
         icon="camera"
         title="Profil fotoğrafları"
-        subtitle="Boş kareye dokunun."
+        subtitle="Basılı tutup sürükleyerek sırayı değiştir. İlk fotoğraf kapaktır."
       />
-      <ErrorText>{error}</ErrorText>
-      <View style={{ gap: 8 }}>
+      <View
+        style={{ gap: 8 }}
+        onLayout={(event) => {
+          const width = event.nativeEvent.layout.width;
+          gridWidthRef.current = width;
+          setGridWidth((current) => (current === width ? current : width));
+        }}
+      >
         {[0, 1, 2].map((row) => (
           <View key={row} style={{ flexDirection: 'row', gap: 8 }}>
             {[0, 1, 2].map((column) => {
@@ -210,38 +285,68 @@ export default function OnboardingPhotos() {
           const video = isVideoType(photo?.contentType) || Boolean(uri?.includes('.mp4'));
           const cover = index === 0;
           const selected = photo?.id === selectedId;
+          const dragging = drag?.index === index;
+          const target = drag ? dropSlot(drag.index, drag.dx, drag.dy, ordered.length, gridWidth) : -1;
+          const cellStyle = [
+            ui.photoCell,
+            { flex: 1, aspectRatio: 1 },
+            cover && ui.photoCover,
+            (selected || index === target) && ui.photoSelected,
+            dragging
+              ? { zIndex: 2, transform: [{ translateX: drag.dx }, { translateY: drag.dy }, { scale: 1.04 }] }
+              : null,
+          ];
+          const media = uri && video ? (
+            <VideoThumb uri={uri} />
+          ) : uri ? (
+            <Image source={{ uri }} style={{ width: '100%', height: '100%' }} accessibilityIgnoresInvertColors />
+          ) : (
+            <Ionicons name={photo ? 'time' : 'add'} size={28} color={colors.textMuted} />
+          );
+          if (!photo) {
+            return (
+              <Pressable
+                key={`empty-${index}`}
+                accessibilityRole="button"
+                accessibilityLabel={`Boş kare ${index + 1}`}
+                disabled={busy}
+                onPress={() => onSlot(index)}
+                style={cellStyle}
+              >
+                {media}
+              </Pressable>
+            );
+          }
           return (
-            <Pressable
-              key={photo?.id ?? `empty-${index}`}
+            <View
+              key={photo.id}
               accessibilityRole="button"
-              accessibilityLabel={photo ? (cover ? 'Kapak fotoğrafı' : `Fotoğraf ${index + 1}`) : `Boş kare ${index + 1}`}
-              disabled={busy}
-              onPress={() => onSlot(index)}
-              style={[
-                ui.photoCell,
-                { flex: 1, aspectRatio: 1 },
-                cover && ui.photoCover,
-                selected && ui.photoSelected,
-              ]}
+              accessibilityLabel={cover ? 'Kapak fotoğrafı' : `Fotoğraf ${index + 1}`}
+              accessibilityHint="Sırayı değiştirmek için basılı tutup sürükle"
+              onTouchStart={() => {
+                touches.current[index] = Date.now();
+              }}
+              onTouchEnd={() => {
+                if (!dragged.current) onSlot(index);
+                dragged.current = false;
+              }}
+              {...cellPans[index]?.panHandlers}
+              style={cellStyle}
             >
-              {uri && video ? (
-                <VideoThumb uri={uri} />
-              ) : uri ? (
-                <Image source={{ uri }} style={{ width: '100%', height: '100%' }} accessibilityIgnoresInvertColors />
-              ) : (
-                <Ionicons name={photo ? 'time' : 'add'} size={28} color={colors.textMuted} />
-              )}
+              <View pointerEvents="none" style={{ flex: 1, width: '100%' }}>
+                {media}
+              </View>
               {cover ? (
                 <View style={[ui.photoBadge, ui.photoBadgeTop]}>
                   <Text style={ui.photoBadgeText}>Kapak</Text>
                 </View>
               ) : null}
-              {photo?.status === 'REJECTED' ? (
+              {photo.status === 'REJECTED' ? (
                 <View style={[ui.photoBadge, ui.photoBadgeBottom]}>
                   <Text style={ui.photoBadgeText}>Reddedildi</Text>
                 </View>
               ) : null}
-            </Pressable>
+            </View>
             );
             })}
           </View>
@@ -260,7 +365,7 @@ export default function OnboardingPhotos() {
           </View>
         </View>
       ) : (
-        busy ? <Text style={[ui.hint, ui.centered]}>Yükleniyor.</Text> : null
+        busy ? <Text style={[ui.hint, ui.centered]}>Fotoğrafın ekleniyor.</Text> : null
       )}
       <PrimaryButton
         label={fromProfile ? 'Bitti' : 'Devam et'}
@@ -272,7 +377,6 @@ export default function OnboardingPhotos() {
           }
           if (!ready) {
             flagMissing(
-              setError,
               ordered.some((photo) => photo.status === 'REJECTED')
                 ? 'Devam etmek için uygun bir profil fotoğrafı ekleyin.'
                 : 'Devam etmek için en az bir profil fotoğrafı ekleyin.',

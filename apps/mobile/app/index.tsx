@@ -22,8 +22,10 @@ export default function Index() {
   });
 
   useEffect(() => {
+    if (status === 'anonymous') router.replace('/login');
     if (status === 'authenticated' && profile.data) router.replace(destination(profile.data));
-  }, [profile.data, router, status]);
+    if (status === 'authenticated' && profile.isError) router.replace('/discover');
+  }, [profile.data, profile.isError, router, status]);
 
   return <BrandSplash />;
 }

@@ -2,7 +2,7 @@ import type { Gender } from '@dating/types';
 import { preferencesSchema } from '@dating/validation';
 import { api, errorMessage } from '@/api';
 import { SelectField } from '@/select-field';
-import { ErrorText, Field, PageHeading, PrimaryButton, Screen, StepBack, flagMissing, showAlert } from '@/ui';
+import { Field, PageHeading, PrimaryButton, Screen, StepBack, flagMissing, showAlert } from '@/ui';
 import { Stack, useRouter } from 'expo-router';
 import { useState } from 'react';
 
@@ -31,7 +31,6 @@ export default function OnboardingPreferences() {
   const [ageMin, setAgeMin] = useState('18');
   const [ageMax, setAgeMax] = useState('35');
   const [distance, setDistance] = useState('50');
-  const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   async function onSubmit() {
@@ -43,7 +42,6 @@ export default function OnboardingPreferences() {
     });
     if (!parsed.success) {
       flagMissing(
-        setError,
         emptyPreferenceMessage(interestedIn, ageMin, ageMax, distance) ??
           parsed.error.issues[0]?.message ??
           'Tercihleri kontrol et.',
@@ -51,14 +49,11 @@ export default function OnboardingPreferences() {
       return;
     }
     setBusy(true);
-    setError(null);
     try {
       await api('/profile/me/preferences', { method: 'PUT', body: parsed.data });
       router.replace('/onboarding/location');
     } catch (caught) {
-      const message = errorMessage(caught);
-      setError(message);
-      showAlert(message, 'Devam edilemedi');
+      showAlert(errorMessage(caught), 'Devam edilemedi');
     } finally {
       setBusy(false);
     }
@@ -70,9 +65,8 @@ export default function OnboardingPreferences() {
       <PageHeading
         icon="options"
         title="Keşif tercihleri"
-        subtitle="Keşfette görmek istediğiniz kişileri, yaş aralığını ve mesafeyi belirleyin. Bu tercihleri daha sonra değiştirebilirsiniz."
+        subtitle="Kimi görmek istediğini seç. Sonra değiştirebilirsin."
       />
-      <ErrorText>{error}</ErrorText>
       <SelectField
         label="İlgi"
         icon="heart"

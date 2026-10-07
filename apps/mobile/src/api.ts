@@ -65,6 +65,7 @@ async function send<T>(path: string, options: RequestOptions): Promise<{ status:
       method: options.method ?? 'GET',
       headers,
       body: options.body === undefined ? undefined : JSON.stringify(options.body),
+      signal: AbortSignal.timeout(12000),
     });
   } catch {
     throw new ApiError('NETWORK_ERROR', 'Sunucuya ulaşılamadı. Bağlantını kontrol et.', 0);

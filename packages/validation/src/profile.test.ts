@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { photoUploadRequestSchema } from './photos';
 import { interestsSchema, locationSchema, preferencesSchema, profileBasicsSchema, usernameSchema } from './profile';
+import { zodiacFromDate } from './profile-prompts';
 
 describe('usernameSchema', () => {
   it('normalizes to lowercase', () => {
@@ -52,6 +53,12 @@ describe('profileBasicsSchema', () => {
       languages: ['TR', 'en', 'tr'],
     });
     expect(parsed).toMatchObject({ heightCm: 172, country: 'TR', languages: ['tr', 'en'] });
+  });
+
+  it('reads zodiac from the UTC calendar day', () => {
+    expect(zodiacFromDate(new Date(Date.UTC(1995, 10, 8)))).toBe('SCORPIO');
+    expect(zodiacFromDate(new Date(Date.UTC(1990, 0, 1)))).toBe('CAPRICORN');
+    expect(zodiacFromDate(new Date(Date.UTC(1992, 2, 21)))).toBe('ARIES');
   });
 
   it('rejects out of range height and non-letter names', () => {
